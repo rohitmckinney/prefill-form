@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Map View Test - Gas Station Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .search-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 15px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        .search-box input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .search-box button {
+            padding: 15px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .search-box button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .search-box button:active {
+            transform: translateY(0);
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+        
+        .data-section {
+            padding: 30px;
+            border-right: 2px solid #e9ecef;
+            max-height: 700px;
+            overflow-y: auto;
+        }
+        
+        .map-section {
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .data-group {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .data-group h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .data-item:last-child {
+            border-bottom: none;
+        }
+        
+        .data-label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 14px;
+        }
+        
+        .data-value {
+            color: #2d3748;
+            font-size: 14px;
+            text-align: right;
+            max-width: 60%;
+            word-wrap: break-word;
+        }
+        
+        .map-container {
+            width: 100%;
+            height: 600px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border: 3px solid #667eea;
+        }
+        
+        .map-controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .map-controls button {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .map-controls button:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .map-controls button.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 18px;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #e53e3e;
+            font-size: 16px;
+        }
+        
+        .mpd-input-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .mpd-input-section label {
+            display: block;
+            font-weight: 600;
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .mpd-input-section input {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ffc107;
+            border-radius: 6px;
+            outline: none;
+        }
+        
+        .instructions {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e7f3ff;
+            border-radius: 6px;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .instructions h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+        
+        .instructions ul {
+            margin-left: 20px;
+            color: #424242;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .instructions li {
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .data-section {
+                border-right: none;
+                border-bottom: 2px solid #e9ecef;
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ 3D Map View Test</h1>
+            <p>Interactive Gas Station Analysis with Embedded Google Maps</p>
+        </div>
+        
+        <div class="search-section">
+            <div class="search-box">
+                <input 
+                    type="text" 
+                    id="addressInput" 
+                    placeholder="Enter gas station address (e.g., 8805 Tara Blvd, Jonesboro, GA)"
+                    value="8805 Tara Blvd, Jonesboro, GA"
+                />
+                <button onclick="searchAddress()">🔍 Search & Load 3D View</button>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="data-section" id="dataSection">
+                <div class="loading">
+                    👆 Enter an address above and click search to load data
+                </div>
+            </div>
+            
+            <div class="map-section">
+                <h2 class="section-title">📍 Interactive 3D Map View</h2>
+                
+                <div class="map-controls" id="mapControls" style="display: none;">
+                    <button onclick="switchMapType('streetview')" class="active" id="btnStreetview">�️ Street View (360°)</button>
+                    <button onclick="switchMapType('satellite')" id="btnSatellite">�️ Satellite View</button>
+                    <button onclick="switchMapType('roadmap')" id="btnRoadmap">�️ Road Map</button>
+                </div>
+                
+                <div class="map-container" id="mapContainer">
+                    <div class="loading">
+                        👆 Search for an address to load the interactive 3D map
+                    </div>
+                </div>
+                
+                <div class="mpd-input-section" style="display: none;" id="mpdSection">
+                    <label for="mpdCount">💡 How many fuel dispensers (MPDs) do you see?</label>
+                    <input 
+                        type="number" 
+                        id="mpdCount" 
+                        min="0" 
+                        max="50" 
+                        placeholder="Count the rectangular dispenser islands under the canopy"
+                    />
+                </div>
+                
+                <div class="instructions">
+                    <h4>🎯 How to Use Interactive Street View:</h4>
+                    <ul>
+                        <li><strong>Click and drag</strong> inside the view to look around 360°</li>
+                        <li><strong>Click arrows</strong> on the road to move to different positions</li>
+                        <li><strong>Zoom in/out</strong> using scroll wheel or +/- buttons</li>
+                        <li><strong>Find the canopy</strong> and try to see fuel dispensers</li>
+                        <li><strong>Switch to Satellite</strong> if Street View doesn't show dispensers clearly</li>
+                        <li><strong>Count MPDs</strong>: Ignore pylon sign, count rectangular islands under canopy</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GOOGLE_MAPS_API_KEY = 'AIzaSyDMyFvqQx5cHw3bZaL85NFWYVo6Dfq8qfo';
+        let currentLocation = null;
+        let currentData = null;
+
+        async function searchAddress() {
+            const address = document.getElementById('addressInput').value.trim();
+            if (!address) {
+                alert('Please enter an address');
+                return;
+            }
+
+            const dataSection = document.getElementById('dataSection');
+            const mapContainer = document.getElementById('mapContainer');
+            const mapControls = document.getElementById('mapControls');
+            const mpdSection = document.getElementById('mpdSection');
+            
+            dataSection.innerHTML = '<div class="loading">⏳ Loading data...</div>';
+            mapContainer.innerHTML = '<div class="loading">⏳ Loading map...</div>';
+            
+            try {
+                // Step 1: Geocode the address
+                const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`;
+                const geocodeResponse = await fetch(geocodeUrl);
+                const geocodeData = await geocodeResponse.json();
+                
+                if (geocodeData.status !== 'OK' || !geocodeData.results.length) {
+                    throw new Error('Address not found');
+                }
+                
+                const location = geocodeData.results[0].geometry.location;
+                currentLocation = location;
+                
+                // Step 2: Search for nearby gas stations
+                const nearbyUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${location.lat},${location.lng}&radius=50&type=gas_station&key=${GOOGLE_MAPS_API_KEY}`;
+                
+                // Note: Direct API calls won't work from browser due to CORS
+                // We'll display the geocoded data and use embedded map
+                
+                currentData = {
+                    address: geocodeData.results[0].formatted_address,
+                    location: location,
+                    placeId: geocodeData.results[0].place_id
+                };
+                
+                displayData(currentData);
+                loadMap('streetview');
+                
+                mapControls.style.display = 'flex';
+                mpdSection.style.display = 'block';
+                
+            } catch (error) {
+                dataSection.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                mapContainer.innerHTML = `<div class="error">❌ Failed to load map</div>`;
+            }
+        }
+
+        function displayData(data) {
+            const dataSection = document.getElementById('dataSection');
+            
+            const html = `
+                <h2 class="section-title">📋 Property Information</h2>
+                
+                <div class="data-group">
+                    <h3>📍 Location Details</h3>
+                    <div class="data-item">
+                        <span class="data-label">Full Address:</span>
+                        <span class="data-value">${data.address}</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Latitude:</span>
+                        <span class="data-value">${data.location.lat}</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Longitude:</span>
+                        <span class="data-value">${data.location.lng}</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Place ID:</span>
+                        <span class="data-value">${data.placeId}</span>
+                    </div>
+                </div>
+                
+                <div class="data-group">
+                    <h3>🗺️ Map Information</h3>
+                    <div class="data-item">
+                        <span class="data-label">Current View:</span>
+                        <span class="data-value" id="currentView">Satellite</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Zoom Level:</span>
+                        <span class="data-value">21 (Maximum Detail)</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Map Type:</span>
+                        <span class="data-value">Interactive (User can drag, zoom, rotate)</span>
+                    </div>
+                </div>
+                
+                <div class="data-group">
+                    <h3>⚙️ Available Actions</h3>
+                    <div class="data-item">
+                        <span class="data-label">✅ Drag Map:</span>
+                        <span class="data-value">Click and drag to pan around</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">✅ Zoom:</span>
+                        <span class="data-value">Scroll wheel or +/- buttons</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">✅ 3D View:</span>
+                        <span class="data-value">Hold Ctrl and drag (desktop)</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">✅ Rotate:</span>
+                        <span class="data-value">Right-click and drag</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">✅ Street View:</span>
+                        <span class="data-value">Click Street View button or drag pegman</span>
+                    </div>
+                </div>
+            `;
+            
+            dataSection.innerHTML = html;
+        }
+
+        function loadMap(mapType) {
+            if (!currentLocation) return;
+            
+            const mapContainer = document.getElementById('mapContainer');
+            const lat = currentLocation.lat;
+            const lng = currentLocation.lng;
+            
+            let embedUrl = '';
+            
+            if (mapType === 'satellite') {
+                // Satellite view with maximum zoom
+                embedUrl = `https://www.google.com/maps/embed/v1/view?key=${GOOGLE_MAPS_API_KEY}&center=${lat},${lng}&zoom=21&maptype=satellite`;
+                document.getElementById('currentView').textContent = 'Satellite (Best for MPD counting)';
+            } else if (mapType === 'roadmap') {
+                // Road map view
+                embedUrl = `https://www.google.com/maps/embed/v1/view?key=${GOOGLE_MAPS_API_KEY}&center=${lat},${lng}&zoom=19&maptype=roadmap`;
+                document.getElementById('currentView').textContent = 'Road Map';
+            } else if (mapType === 'streetview') {
+                // Street view - Interactive 360 degree view
+                embedUrl = `https://www.google.com/maps/embed/v1/streetview?key=${GOOGLE_MAPS_API_KEY}&location=${lat},${lng}&heading=0&pitch=0&fov=100`;
+                document.getElementById('currentView').textContent = 'Street View (360° - Drag to look around)';
+            }
+            
+            mapContainer.innerHTML = `
+                <iframe
+                    width="100%"
+                    height="100%"
+                    style="border:0"
+                    loading="lazy"
+                    allowfullscreen
+                    referrerpolicy="no-referrer-when-downgrade"
+                    src="${embedUrl}">
+                </iframe>
+            `;
+        }
+
+        function switchMapType(type) {
+            // Update button states
+            document.querySelectorAll('.map-controls button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            if (type === 'satellite') {
+                document.getElementById('btnSatellite').classList.add('active');
+            } else if (type === 'roadmap') {
+                document.getElementById('btnRoadmap').classList.add('active');
+            } else if (type === 'streetview') {
+                document.getElementById('btnStreetview').classList.add('active');
+            }
+            
+            loadMap(type);
+        }
+
+        // Allow Enter key to search
+        document.getElementById('addressInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchAddress();
+            }
+        });
+
+        // Track MPD count input
+        document.getElementById('mpdCount').addEventListener('change', function() {
+            const count = this.value;
+            if (count) {
+                console.log(`User counted ${count} MPDs at ${currentData?.address}`);
+                // You can send this to your API or save it
+            }
+        });
+    </script>
+</body>
+</html>

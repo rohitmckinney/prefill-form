@@ -9,14 +9,18 @@ export default function AuthPage() {
   const router = useRouter()
 
   const agents = [
+    'Amber',
+    'Ana',
+    'Zara',
+    'Munira',
     'Sana',
+    'Tanya',
     'Tej',
-    'Rabel',
-    'Rahim',
-    'Rohit',
-    'Shahzaib',
+    'Raabel',
+    'Razia',
+    'Shahmir',
+    'Amir',
     'Arish',
-    'Asad',
     'Other (Enter Name)'
   ]
 

@@ -27,6 +27,14 @@ export default function HomePage() {
   const [agentProfile, setAgentProfile] = useState<string>('')
   const [showAreaMeasurementTool, setShowAreaMeasurementTool] = useState(false)
   const [measuredArea, setMeasuredArea] = useState<number | null>(null)
+  const [isSavingToGHL, setIsSavingToGHL] = useState(false)
+  const [ghlMessage, setGhlMessage] = useState<string | null>(null)
+  const [showResumePanel, setShowResumePanel] = useState(false)
+  const [resumeForms, setResumeForms] = useState<any[]>([])
+  const [isLoadingResumeForms, setIsLoadingResumeForms] = useState(false)
+  const [selectedResumeForm, setSelectedResumeForm] = useState<string | null>(null)
+  const [resumedOpportunityId, setResumedOpportunityId] = useState<string | null>(null)
+  const [resumedContactId, setResumedContactId] = useState<string | null>(null)
   const router = useRouter()
   const addressInputRef = useRef<HTMLInputElement>(null)
 
@@ -35,8 +43,30 @@ export default function HomePage() {
     const profile = localStorage.getItem('agentProfile')
     if (profile) {
       setAgentProfile(profile)
+      // Fetch resume forms when agent logs in
+      fetchResumeForms()
     }
   }, [])
+
+  // Fetch all opportunities from unfilled stage
+  const fetchResumeForms = async () => {
+    setIsLoadingResumeForms(true)
+    try {
+      const response = await fetch('/api/ghl/resume')
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setResumeForms(result.forms || [])
+        console.log(`✅ Loaded ${result.forms?.length || 0} incomplete forms`)
+      } else {
+        console.error('Failed to fetch resume forms:', result.error)
+      }
+    } catch (error: any) {
+      console.error('Error fetching resume forms:', error)
+    } finally {
+      setIsLoadingResumeForms(false)
+    }
+  }
 
   // EXPERIMENTAL: Super simple Google Autocomplete - no fancy stuff
   useEffect(() => {
@@ -370,15 +400,106 @@ export default function HomePage() {
     setTimeout(() => setFetchMessage(null), 5000)
   }
 
-  const onSubmit = (data: FormData) => {
+  const onSubmit = async (data: FormData) => {
     console.log('Form submitted with data:', data)
     setSubmittedData(data)
-    setIsSubmitted(true)
-    setShowSuccess(true)
     
-    setTimeout(() => {
-      setShowSuccess(false)
-    }, 3000)
+    // Also save to GHL when submitting
+    setIsSavingToGHL(true)
+    setGhlMessage(null)
+    
+    try {
+      console.log('📤 Saving to GoHighLevel on form submission...')
+      
+      const response = await fetch('/api/ghl', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...data,
+          _resumedOpportunityId: resumedOpportunityId,
+          _resumedContactId: resumedContactId
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setGhlMessage(`✅ Successfully saved to GoHighLevel! Contact ID: ${result.contactId || 'N/A'}. Complete JSON saved in contact note.`)
+        setIsSubmitted(true)
+        setShowSuccess(true)
+      } else {
+        // Still show success for form submission, but warn about GHL
+        setGhlMessage(`⚠️ Form submitted, but GHL save failed: ${result.error || 'Unknown error'}`)
+        setIsSubmitted(true)
+        setShowSuccess(true)
+      }
+    } catch (error: any) {
+      console.error('Error saving to GHL:', error)
+      // Still show success for form submission, but warn about GHL
+      setGhlMessage(`⚠️ Form submitted, but GHL error: ${error.message || 'Unknown error'}`)
+      setIsSubmitted(true)
+      setShowSuccess(true)
+    } finally {
+      setIsSavingToGHL(false)
+      setTimeout(() => {
+        setShowSuccess(false)
+        setGhlMessage(null)
+      }, 5000)
+    }
+  }
+
+  const saveToGHL = async () => {
+    // Get current form values
+    const formData = watch()
+    
+    // Validate required fields for full submission
+    if (!formData.corporationName || !formData.contactName || !formData.contactEmail || !formData.contactNumber) {
+      setGhlMessage('❌ Please fill in all required fields: Corporation Name, Contact Name, Contact Email, and Contact Number')
+      setTimeout(() => setGhlMessage(null), 5000)
+      return
+    }
+
+    setIsSavingToGHL(true)
+    setGhlMessage(null)
+
+    try {
+      console.log('📤 Saving to GoHighLevel...', {
+        corporationName: formData.corporationName,
+        contactName: formData.contactName,
+        contactEmail: formData.contactEmail,
+        contactNumber: formData.contactNumber
+      })
+
+      const response = await fetch('/api/ghl', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          _resumedOpportunityId: resumedOpportunityId,
+          _resumedContactId: resumedContactId
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setGhlMessage(`✅ Successfully saved to GoHighLevel! Contact ID: ${result.contactId || 'N/A'}. Complete JSON saved in note.`)
+        setTimeout(() => setGhlMessage(null), 5000)
+      } else {
+        setGhlMessage(`❌ Failed to save: ${result.error || 'Unknown error'}`)
+        setTimeout(() => setGhlMessage(null), 5000)
+      }
+    } catch (error: any) {
+      console.error('Error saving to GHL:', error)
+      setGhlMessage(`❌ Error: ${error.message || 'Failed to save to GoHighLevel'}`)
+      setTimeout(() => setGhlMessage(null), 5000)
+    } finally {
+      setIsSavingToGHL(false)
+    }
   }
 
   const downloadPDF = () => {
@@ -396,6 +517,115 @@ export default function HomePage() {
     setShowSuccess(false)
     setShowSidePanelData(false)
     setSmartyData(null)
+    setGhlMessage(null)
+    setIsSavingToGHL(false)
+    setResumedOpportunityId(null)
+    setResumedContactId(null)
+    setSelectedResumeForm(null)
+  }
+
+  // Resume a form from GHL
+  const handleResumeForm = (form: any) => {
+    if (!form.formData) return
+
+    // Set resumed opportunity and contact IDs
+    setResumedOpportunityId(form.opportunityId)
+    setResumedContactId(form.contactId)
+    setSelectedResumeForm(form.opportunityId)
+
+    // Map form data back to form fields
+    const formData = form.formData
+
+    // Personal Info
+    if (formData.personalInfo) {
+      if (formData.personalInfo.contactName) setValue('contactName', formData.personalInfo.contactName)
+      if (formData.personalInfo.contactEmail) setValue('contactEmail', formData.personalInfo.contactEmail)
+      if (formData.personalInfo.contactNumber) setValue('contactNumber', formData.personalInfo.contactNumber)
+      if (formData.personalInfo.corporationName) setValue('corporationName', formData.personalInfo.corporationName)
+    }
+
+    // Company Info
+    if (formData.companyInfo) {
+      if (formData.companyInfo.address) setValue('address', formData.companyInfo.address)
+      if (formData.companyInfo.dba) setValue('dba', formData.companyInfo.dba)
+      if (formData.companyInfo.applicantType) setValue('applicantType', formData.companyInfo.applicantType)
+      if (formData.companyInfo.yearsInBusiness) setValue('yearsInBusiness', formData.companyInfo.yearsInBusiness)
+      if (formData.companyInfo.ownershipType) setValue('ownershipType', formData.companyInfo.ownershipType)
+      if (formData.companyInfo.operationDescription) setValue('operationDescription', formData.companyInfo.operationDescription)
+    }
+
+    // Property Details
+    if (formData.propertyDetails) {
+      if (formData.propertyDetails.hoursOfOperation) setValue('hoursOfOperation', formData.propertyDetails.hoursOfOperation)
+      if (formData.propertyDetails.numberOfMPDs) setValue('noOfMPDs', formData.propertyDetails.numberOfMPDs)
+      if (formData.propertyDetails.constructionType) setValue('constructionType', formData.propertyDetails.constructionType)
+      if (formData.propertyDetails.totalSqFootage) setValue('totalSqFootage', formData.propertyDetails.totalSqFootage)
+      if (formData.propertyDetails.yearBuilt) setValue('yearBuilt', formData.propertyDetails.yearBuilt)
+      if (formData.propertyDetails.yearsInCurrentLocation) setValue('yearsAtLocation', formData.propertyDetails.yearsInCurrentLocation)
+      if (formData.propertyDetails.leasedSpace) setValue('anyLeasedOutSpace', formData.propertyDetails.leasedSpace)
+      if (formData.propertyDetails.protectionClass) setValue('protectionClass', formData.propertyDetails.protectionClass)
+      if (formData.propertyDetails.additionalInsured) setValue('additionalInsured', formData.propertyDetails.additionalInsured)
+      if (formData.propertyDetails.burglarAlarm) {
+        const burglarAlarm = formData.propertyDetails.burglarAlarm
+        if (burglarAlarm === 'Central Station' || burglarAlarm === 'Both') {
+          setValue('burglarAlarm', { centralStation: true, local: burglarAlarm === 'Both' })
+        } else if (burglarAlarm === 'Local') {
+          setValue('burglarAlarm', { centralStation: false, local: true })
+        } else {
+          setValue('burglarAlarm', { centralStation: false, local: false })
+        }
+      }
+      if (formData.propertyDetails.fireAlarm) {
+        const fireAlarm = formData.propertyDetails.fireAlarm
+        if (fireAlarm === 'Central Station' || fireAlarm === 'Both') {
+          setValue('fireAlarm', { centralStation: true, local: fireAlarm === 'Both' })
+        } else if (fireAlarm === 'Local') {
+          setValue('fireAlarm', { centralStation: false, local: true })
+        } else {
+          setValue('fireAlarm', { centralStation: false, local: false })
+        }
+      }
+    }
+
+    // Sales Data
+    if (formData.salesData) {
+      if (formData.salesData.inside?.monthly) setValue('insideSalesMonthly', formData.salesData.inside.monthly)
+      if (formData.salesData.inside?.yearly) setValue('insideSalesYearly', formData.salesData.inside.yearly)
+      if (formData.salesData.liquor?.monthly) setValue('liquorSalesMonthly', formData.salesData.liquor.monthly)
+      if (formData.salesData.liquor?.yearly) setValue('liquorSalesYearly', formData.salesData.liquor.yearly)
+      if (formData.salesData.gasoline?.monthly) setValue('gasolineSalesMonthly', formData.salesData.gasoline.monthly)
+      if (formData.salesData.gasoline?.yearly) setValue('gasolineSalesYearly', formData.salesData.gasoline.yearly)
+      if (formData.salesData.propane?.monthly) setValue('propaneSalesMonthly', formData.salesData.propane.monthly)
+      if (formData.salesData.propane?.yearly) setValue('propaneSalesYearly', formData.salesData.propane.yearly)
+      if (formData.salesData.carwash?.monthly) setValue('carwashMonthly', formData.salesData.carwash.monthly)
+      if (formData.salesData.carwash?.yearly) setValue('carwashYearly', formData.salesData.carwash.yearly)
+      if (formData.salesData.cooking?.monthly) setValue('cookingMonthly', formData.salesData.cooking.monthly)
+      if (formData.salesData.cooking?.yearly) setValue('cookingYearly', formData.salesData.cooking.yearly)
+    }
+
+    // Coverage
+    if (formData.coverage) {
+      if (formData.coverage.building) setValue('building', formData.coverage.building)
+      if (formData.coverage.bpp) setValue('bpp', formData.coverage.bpp)
+      if (formData.coverage.bi) setValue('bi', formData.coverage.bi)
+      if (formData.coverage.canopy) setValue('canopy', formData.coverage.canopy)
+      if (formData.coverage.pumps) setValue('pumps', formData.coverage.pumps)
+      if (formData.coverage.signsLighting) setValue('ms', formData.coverage.signsLighting)
+    }
+
+    // Business Details
+    if (formData.businessDetails) {
+      if (formData.businessDetails.fein) setValue('fein', formData.businessDetails.fein)
+      if (formData.businessDetails.numberOfEmployees) setValue('noOfEmployees', formData.businessDetails.numberOfEmployees)
+      if (formData.businessDetails.annualPayroll) setValue('payroll', formData.businessDetails.annualPayroll)
+      if (formData.businessDetails.officers) setValue('officersInclExcl', formData.businessDetails.officers)
+      if (formData.businessDetails.ownershipPercentage) setValue('ownership', formData.businessDetails.ownershipPercentage)
+    }
+
+    // Close panel after loading
+    setShowResumePanel(false)
+    setGhlMessage(`✅ Form resumed: ${form.contactName} - ${form.corporationName}`)
+    setTimeout(() => setGhlMessage(null), 5000)
   }
 
   // Drag and drop handlers
@@ -463,6 +693,7 @@ export default function HomePage() {
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
           {isDragOver && (
             <span className="ml-2 text-blue-600 text-xs animate-pulse">Drop here!</span>
           )}
@@ -493,13 +724,150 @@ export default function HomePage() {
           <div className="w-2 h-2 bg-white rounded-full"></div>
           <span className="font-light tracking-wide">{agentProfile}</span>
         </div>
-        <button
-          onClick={handleLogout}
-          className="text-white hover:text-gray-300 transition-colors font-light text-sm tracking-wide"
-        >
-          Logout
-        </button>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => {
+              setShowResumePanel(!showResumePanel)
+              if (!showResumePanel) {
+                fetchResumeForms()
+              }
+            }}
+            className="text-white hover:text-gray-300 transition-colors font-light text-sm tracking-wide flex items-center space-x-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Resume Forms ({resumeForms.length})</span>
+          </button>
+          <button
+            onClick={handleLogout}
+            className="text-white hover:text-gray-300 transition-colors font-light text-sm tracking-wide"
+          >
+            Logout
+          </button>
+        </div>
       </div>
+
+      {/* Resume Panel - Left Side Overlay */}
+      {showResumePanel && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black bg-opacity-50"
+            onClick={() => setShowResumePanel(false)}
+          ></div>
+          
+          {/* Panel */}
+          <div className="relative w-96 bg-white shadow-2xl overflow-y-auto">
+            {/* Panel Header */}
+            <div className="sticky top-0 bg-black text-white py-4 px-6 flex justify-between items-center z-10">
+              <h2 className="text-lg font-semibold">Resume Forms</h2>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={fetchResumeForms}
+                  disabled={isLoadingResumeForms}
+                  className="text-white hover:text-gray-300 transition-colors disabled:opacity-50"
+                  title="Refresh forms"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setShowResumePanel(false)}
+                  className="text-white hover:text-gray-300 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Panel Content */}
+            <div className="p-4">
+              {isLoadingResumeForms ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto"></div>
+                  <p className="mt-4 text-gray-600">Loading forms...</p>
+                </div>
+              ) : resumeForms.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No forms found</p>
+                  <button
+                    onClick={fetchResumeForms}
+                    disabled={isLoadingResumeForms}
+                    className="mt-4 px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+                  >
+                    {isLoadingResumeForms ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {resumeForms.map((form) => (
+                    <div
+                      key={form.opportunityId}
+                      className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                        selectedResumeForm === form.opportunityId
+                          ? 'border-black bg-gray-50'
+                          : 'border-gray-200 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedResumeForm === form.opportunityId}
+                          onChange={() => setSelectedResumeForm(
+                            selectedResumeForm === form.opportunityId ? null : form.opportunityId
+                          )}
+                          className="mt-1 h-4 w-4 text-black focus:ring-black border-gray-300 rounded"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate">
+                            {form.corporationName}
+                          </h3>
+                          <p className="text-sm text-gray-600 truncate">
+                            {form.contactName}
+                          </p>
+                          <div className="mt-2 flex items-center justify-between">
+                            <span className="text-xs text-gray-500">
+                              {new Date(form.dateSaved).toLocaleDateString()}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              form.completionPercent >= 80
+                                ? 'bg-green-100 text-green-800'
+                                : form.completionPercent >= 50
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {form.completionPercent}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Continue Button */}
+                  {selectedResumeForm && (
+                    <button
+                      onClick={() => {
+                        const selectedForm = resumeForms.find(f => f.opportunityId === selectedResumeForm)
+                        if (selectedForm) {
+                          handleResumeForm(selectedForm)
+                        }
+                      }}
+                      className="w-full mt-4 px-4 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-semibold"
+                    >
+                      Continue with Selected Form
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="py-8 px-4">
         <div className="max-w-7xl mx-auto h-full">
@@ -579,6 +947,52 @@ export default function HomePage() {
                         {fetchMessage}
                       </div>
                     )}
+                  </div>
+
+                  {/* Ownership Type Selection */}
+                  <div className="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-800">👤 Ownership Type</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <label className="flex items-center space-x-3 p-3 bg-white border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                        <input
+                          type="radio"
+                          {...register('ownershipType')}
+                          value="Owner"
+                          className="w-5 h-5 text-blue-600"
+                        />
+                        <span className="font-medium text-gray-700">Owner</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-3 p-3 bg-white border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                        <input
+                          type="radio"
+                          {...register('ownershipType')}
+                          value="Tenant"
+                          className="w-5 h-5 text-blue-600"
+                        />
+                        <span className="font-medium text-gray-700">Tenant</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-3 p-3 bg-white border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                        <input
+                          type="radio"
+                          {...register('ownershipType')}
+                          value="Lessor's Risk"
+                          className="w-5 h-5 text-blue-600"
+                        />
+                        <span className="font-medium text-gray-700">Lessor's Risk</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-3 p-3 bg-white border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                        <input
+                          type="radio"
+                          {...register('ownershipType')}
+                          value="Triple Net Lease"
+                          className="w-5 h-5 text-blue-600"
+                        />
+                        <span className="font-medium text-gray-700">Triple Net Lease</span>
+                      </label>
+                    </div>
                   </div>
 
                   {/* Data Validation Warning - Only show for FAILED validation */}
@@ -723,29 +1137,7 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* Row 4: Ownership Type (Inline Radio Buttons) */}
-                    <div className="mb-2">
-                      <div className="flex flex-wrap gap-3">
-                        {[
-                          { value: 'owner', label: 'Owner' },
-                          { value: 'tenant', label: 'Tenant' },
-                          { value: 'lessorsRisk', label: "Lessor's Risk" },
-                          { value: 'tripleNetLease', label: 'Triple Net Lease' }
-                        ].map((option) => (
-                          <label key={option.value} className="flex items-center">
-                            <input
-                              type="radio"
-                              {...register('ownershipType')}
-                              value={option.value}
-                              className="mr-1"
-                            />
-                            <span className="text-sm text-gray-700">{option.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Row 5: Operation Description + DBA */}
+                    {/* Row 4: Operation Description + DBA */}
                     <div className="grid grid-cols-2 gap-3">
                       <DragDropFormField 
                         name="operationDescription" 
@@ -1150,6 +1542,17 @@ export default function HomePage() {
                       </table>
                     </div>
 
+                    {/* GHL Save Message */}
+                    {ghlMessage && (
+                      <div className={`mt-4 p-3 rounded-md text-sm ${
+                        ghlMessage.includes('✅') 
+                          ? 'bg-green-100 text-green-800 border border-green-200' 
+                          : 'bg-red-100 text-red-800 border border-red-200'
+                      }`}>
+                        {ghlMessage}
+                      </div>
+                    )}
+
                     {/* Submit Button */}
                     <div className="flex justify-between items-center pt-6">
                       <button
@@ -1159,15 +1562,47 @@ export default function HomePage() {
                       >
                         Reset Form
                       </button>
-                      <button
-                        type="submit"
-                        className="px-8 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center space-x-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>Submit Application</span>
-                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={saveToGHL}
+                          disabled={isSavingToGHL}
+                          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                        >
+                          {isSavingToGHL ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              <span>Saving...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                              </svg>
+                              <span>Save in GHL</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSavingToGHL}
+                          className="px-8 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                        >
+                          {isSavingToGHL ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              <span>Saving to GHL...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>Submit Application</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </form>
                 </>
@@ -1182,9 +1617,22 @@ export default function HomePage() {
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
                     Application Submitted Successfully!
                   </h3>
-                  <p className="text-gray-600 mb-8">
+                  <p className="text-gray-600 mb-4">
                     Thank you for submitting your convenience store application. Our team will review it and get back to you soon.
                   </p>
+                  
+                  {/* GHL Save Status */}
+                  {ghlMessage && (
+                    <div className={`mb-6 p-3 rounded-md text-sm max-w-md mx-auto ${
+                      ghlMessage.includes('✅') 
+                        ? 'bg-green-100 text-green-800 border border-green-200' 
+                        : ghlMessage.includes('⚠️')
+                        ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                        : 'bg-red-100 text-red-800 border border-red-200'
+                    }`}>
+                      {ghlMessage}
+                    </div>
+                  )}
                   
                   <div className="flex justify-center space-x-4">
                     <button
