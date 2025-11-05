@@ -10,10 +10,12 @@ export async function POST(request: NextRequest) {
     // Check if this is a resumed form (update existing opportunity)
     const resumedOpportunityId = formData._resumedOpportunityId
     const resumedContactId = formData._resumedContactId
+    const agentName = formData._agentName
 
     // Remove internal fields from formData
     delete formData._resumedOpportunityId
     delete formData._resumedContactId
+    delete formData._agentName
 
     // Validate required fields for contact creation
     if (!formData.corporationName || !formData.contactName || !formData.contactEmail || !formData.contactNumber) {
@@ -43,6 +45,11 @@ export async function POST(request: NextRequest) {
       // Type assertion: we've validated these exist above
       const apiKey: string = GHL_API_KEY!
       const locationId: string = GHL_LOCATION_ID!
+      
+      // Update contact's agent name if provided
+      if (agentName) {
+        await updateContactAgentName(resumedContactId, agentName, apiKey)
+      }
       
       // Update opportunity with new data
       const opportunityId = await updateOpportunityWithData(resumedOpportunityId, resumedContactId, formData, apiKey, locationId)
@@ -157,6 +164,11 @@ export async function POST(request: NextRequest) {
       console.log('✅ Contact created in GoHighLevel:', ghlData.contact?.id)
       
       if (ghlData.contact?.id) {
+        // Update contact's agent name if provided (must be done after creation)
+        if (agentName) {
+          await updateContactAgentName(ghlData.contact.id, agentName, GHL_API_KEY!)
+        }
+        
         const opportunityId = await createOpportunityWithJSON(ghlData.contact.id, formData, GHL_API_KEY, GHL_LOCATION_ID)
         
         // Add complete JSON as note to contact (more reliable than opportunity notes)
@@ -492,6 +504,47 @@ async function updateOpportunityWithJSONField(opportunityId: string, jsonString:
     }
   } catch (error) {
     console.error('Error updating opportunity custom field:', error)
+  }
+}
+
+// Update contact's assigned agent name
+async function updateContactAgentName(contactId: string, agentName: string, apiKey: string) {
+  try {
+    console.log('👤 Updating contact agent name:', agentName)
+    
+    const authHeader = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`
+    
+    const updateData = {
+      customFields: [
+        {
+          key: 'assigned_mckinney_agent',
+          value: agentName
+        }
+      ]
+    }
+    
+    const updateResponse = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Version': '2021-07-28'
+      },
+      body: JSON.stringify(updateData)
+    })
+    
+    if (updateResponse.ok) {
+      console.log('✅ Contact agent name updated successfully')
+      return true
+    } else {
+      const errorText = await updateResponse.text()
+      console.error('❌ Failed to update contact agent name:', errorText)
+      return false
+    }
+  } catch (error) {
+    console.error('Error updating contact agent name:', error)
+    return false
   }
 }
 

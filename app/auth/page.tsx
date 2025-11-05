@@ -18,9 +18,7 @@ export default function AuthPage() {
     'Tej',
     'Raabel',
     'Razia',
-    'Shahmir',
-    'Amir',
-    'Arish',
+    'Shahnaz',
     'Other (Enter Name)'
   ]
 

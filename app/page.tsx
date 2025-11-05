@@ -411,6 +411,9 @@ export default function HomePage() {
     try {
       console.log('📤 Saving to GoHighLevel on form submission...')
       
+      // Get agent name from localStorage
+      const agentName = typeof window !== 'undefined' ? localStorage.getItem('agentProfile') : null
+      
       const response = await fetch('/api/ghl', {
         method: 'POST',
         headers: {
@@ -419,7 +422,8 @@ export default function HomePage() {
         body: JSON.stringify({
           ...data,
           _resumedOpportunityId: resumedOpportunityId,
-          _resumedContactId: resumedContactId
+          _resumedContactId: resumedContactId,
+          _agentName: agentName || null
         }),
       })
 
@@ -472,6 +476,9 @@ export default function HomePage() {
         contactNumber: formData.contactNumber
       })
 
+      // Get agent name from localStorage
+      const agentName = typeof window !== 'undefined' ? localStorage.getItem('agentProfile') : null
+      
       const response = await fetch('/api/ghl', {
         method: 'POST',
         headers: {
@@ -480,7 +487,8 @@ export default function HomePage() {
         body: JSON.stringify({
           ...formData,
           _resumedOpportunityId: resumedOpportunityId,
-          _resumedContactId: resumedContactId
+          _resumedContactId: resumedContactId,
+          _agentName: agentName || null
         }),
       })
 
