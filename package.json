@@ -13,6 +13,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "canvas-confetti": "^1.9.3",
     "dotenv": "^17.2.3",
     "framer-motion": "^10.16.4",
     "jspdf": "^2.5.1",
@@ -26,6 +27,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/canvas-confetti": "^1.6.4",
     "autoprefixer": "^10",
     "eslint": "^8",
     "eslint-config-next": "14.0.0",
