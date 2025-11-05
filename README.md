@@ -86,6 +86,59 @@ npm run build
 npm start
 ```
 
+## Railway Deployment
+
+This application is configured for deployment on Railway.
+
+### Prerequisites
+
+1. A Railway account ([railway.app](https://railway.app))
+2. GitHub repository connected to Railway
+
+### Deployment Steps
+
+1. **Create a new Railway project:**
+   - Go to [railway.app](https://railway.app)
+   - Click "New Project"
+   - Select "Deploy from GitHub repo"
+   - Choose your repository
+
+2. **Configure Environment Variables:**
+   Add these environment variables in Railway project settings:
+   ```
+   GHL_API_KEY=your_ghl_api_key_here
+   GHL_LOCATION_ID=your_ghl_location_id_here
+   ```
+   Optional (if using Google Maps or Smarty Streets):
+   ```
+   GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+   SMARTY_AUTH_ID=your_smarty_auth_id_here
+   SMARTY_AUTH_TOKEN=your_smarty_auth_token_here
+   ```
+
+3. **Deploy:**
+   - Railway will automatically detect Next.js
+   - Build and deploy will start automatically
+   - Your app will be live at `https://your-app.railway.app`
+
+### Railway Configuration
+
+- **Build Command:** `npm run build` (automatically detected)
+- **Start Command:** `npm start` (automatically detected)
+- **Output:** Standalone build for optimal performance
+
+### Environment Variables
+
+Required for the application to work:
+
+- `GHL_API_KEY` - GoHighLevel API key for CRM integration
+- `GHL_LOCATION_ID` - GoHighLevel location ID
+
+Optional:
+- `GOOGLE_MAPS_API_KEY` - For Google Maps features
+- `SMARTY_AUTH_ID` - For Smarty Streets address validation
+- `SMARTY_AUTH_TOKEN` - For Smarty Streets address validation
+
 ## License
 
 Private - Mckinney & Co. Insurance
