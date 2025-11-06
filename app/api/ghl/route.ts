@@ -11,11 +11,13 @@ export async function POST(request: NextRequest) {
     const resumedOpportunityId = formData._resumedOpportunityId
     const resumedContactId = formData._resumedContactId
     const agentName = formData._agentName
+    const leadSource = formData._leadSource
 
     // Remove internal fields from formData
     delete formData._resumedOpportunityId
     delete formData._resumedContactId
     delete formData._agentName
+    delete formData._leadSource
 
     // Validate required fields for contact creation
     if (!formData.corporationName || !formData.contactName || !formData.contactEmail || !formData.contactNumber) {
@@ -23,6 +25,17 @@ export async function POST(request: NextRequest) {
         { 
           success: false, 
           error: 'Missing required fields: Corporation Name, Contact Name, Contact Email, and Contact Number are required' 
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validate lead source is provided
+    if (!leadSource || leadSource.trim() === '') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Lead Source is required' 
         },
         { status: 400 }
       )
@@ -52,7 +65,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Update opportunity with new data
-      const opportunityId = await updateOpportunityWithData(resumedOpportunityId, resumedContactId, formData, apiKey, locationId)
+      const opportunityId = await updateOpportunityWithData(resumedOpportunityId, resumedContactId, formData, apiKey, leadSource, locationId)
       
       // Add updated JSON as new note
       await addFormDataAsNote(resumedContactId, formData, apiKey, resumedOpportunityId)
@@ -169,7 +182,7 @@ export async function POST(request: NextRequest) {
           await updateContactAgentName(ghlData.contact.id, agentName, GHL_API_KEY!)
         }
         
-        const opportunityId = await createOpportunityWithJSON(ghlData.contact.id, formData, GHL_API_KEY, GHL_LOCATION_ID)
+        const opportunityId = await createOpportunityWithJSON(ghlData.contact.id, formData, GHL_API_KEY, leadSource, GHL_LOCATION_ID)
         
         // Add complete JSON as note to contact (more reliable than opportunity notes)
         await addFormDataAsNote(ghlData.contact.id, formData, GHL_API_KEY, opportunityId || undefined)
@@ -280,7 +293,7 @@ function buildCompleteJSONData(formData: any) {
 }
 
 // Create opportunity with mapped fields
-async function createOpportunityWithJSON(contactId: string, formData: any, apiKey: string, locationId?: string) {
+async function createOpportunityWithJSON(contactId: string, formData: any, apiKey: string, leadSource: string, locationId?: string) {
   try {
     // Use the specific pipeline and stage IDs provided
     const pipelineId = 'eognXr6blkaNJne4dTvs'
@@ -290,6 +303,7 @@ async function createOpportunityWithJSON(contactId: string, formData: any, apiKe
     console.log('   Pipeline:', pipelineId)
     console.log('   Stage:', pipelineStageId)
     console.log('   Contact:', contactId)
+    console.log('   Lead Source:', leadSource)
     
     const buildingCoverage = parseFloat(formData.building?.replace(/[^0-9.]/g, '') || '0')
     const bppCoverage = parseFloat(formData.bpp?.replace(/[^0-9.]/g, '') || '0')
@@ -308,7 +322,7 @@ async function createOpportunityWithJSON(contactId: string, formData: any, apiKe
       keys: Object.keys(completeJSONData)
     })
     
-    // Create opportunity without custom fields first (GHL doesn't accept customFields during creation)
+    // Create opportunity without leadSource first (GHL doesn't accept leadSource during creation)
     const opportunityData: any = {
       contactId: contactId,
       name: `${formData.dba || formData.corporationName || formData.contactName} - C-Store Insurance`,
@@ -322,7 +336,7 @@ async function createOpportunityWithJSON(contactId: string, formData: any, apiKe
       opportunityData.locationId = locationId
     }
     
-    console.log('📤 Opportunity data:', opportunityData)
+    console.log('📤 Opportunity data (without leadSource):', opportunityData)
     // Ensure Authorization header has Bearer prefix for pit- tokens
     const oppAuthHeader = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`
     
@@ -343,8 +357,10 @@ async function createOpportunityWithJSON(contactId: string, formData: any, apiKe
       console.log('✅ Opportunity created successfully!')
       console.log('   Opportunity ID:', opportunityId)
       
-      // Note: Custom fields don't work in GHL, so we'll save JSON in note instead
-      // Skip the custom field update since it doesn't work
+      // Update opportunity with lead source (must be done after creation)
+      if (opportunityId && leadSource) {
+        await updateOpportunityLeadSource(opportunityId, leadSource.trim(), apiKey)
+      }
       
       return opportunityId
     } else {
@@ -362,11 +378,12 @@ async function createOpportunityWithJSON(contactId: string, formData: any, apiKe
 }
 
 // Update existing opportunity with new form data
-async function updateOpportunityWithData(opportunityId: string, contactId: string, formData: any, apiKey: string, locationId?: string) {
+async function updateOpportunityWithData(opportunityId: string, contactId: string, formData: any, apiKey: string, leadSource: string, locationId?: string) {
   try {
     console.log('🔄 Updating opportunity with new data...')
     console.log('   Opportunity ID:', opportunityId)
     console.log('   Contact ID:', contactId)
+    console.log('   Lead Source:', leadSource)
     
     const pipelineId = 'eognXr6blkaNJne4dTvs'
     const pipelineStageId = '1d2218ac-d2ac-4ef2-8dc3-46e76b9d9b4c'
@@ -385,7 +402,7 @@ async function updateOpportunityWithData(opportunityId: string, contactId: strin
       monetaryValue: estimatedValue > 0 ? estimatedValue : 0,
     }
     
-    // Note: Do NOT include locationId in update requests
+    // Note: Do NOT include locationId or leadSource in update requests (must be done separately)
     console.log('📤 Updating opportunity with:', opportunityUpdate)
     
     const oppAuthHeader = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`
@@ -400,11 +417,17 @@ async function updateOpportunityWithData(opportunityId: string, contactId: strin
       },
       body: JSON.stringify(opportunityUpdate)
     })
-    
+
     if (updateResponse.ok) {
       const oppData = await updateResponse.json()
       console.log('✅ Opportunity updated successfully!')
       console.log('   Opportunity ID:', opportunityId)
+      
+      // Update opportunity with lead source (must be done separately)
+      if (leadSource) {
+        await updateOpportunityLeadSource(opportunityId, leadSource.trim(), apiKey)
+      }
+      
       return opportunityId
     } else {
       const errorText = await updateResponse.text()
@@ -416,6 +439,80 @@ async function updateOpportunityWithData(opportunityId: string, contactId: strin
   } catch (error) {
     console.error('Error updating opportunity:', error)
     return null
+  }
+}
+
+// Update opportunity with lead source (must be done separately as custom field)
+async function updateOpportunityLeadSource(opportunityId: string, leadSource: string, apiKey: string) {
+  try {
+    console.log('📝 Updating opportunity lead source as custom field...')
+    console.log('   Opportunity ID:', opportunityId)
+    console.log('   Lead Source:', leadSource)
+    console.log('   Custom Field Key: lead_source')
+    
+    // Use customFields array format for custom field {{ opportunity.lead_source }}
+    const updateData = {
+      customFields: [
+        {
+          key: 'lead_source', // GoHighLevel custom field: {{ opportunity.lead_source }}
+          value: leadSource
+        }
+      ]
+    }
+    
+    const oppAuthHeader = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`
+    
+    const updateResponse = await fetch(`https://services.leadconnectorhq.com/opportunities/${opportunityId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': oppAuthHeader,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Version': '2021-07-28'
+      },
+      body: JSON.stringify(updateData)
+    })
+    
+    if (updateResponse.ok) {
+      console.log('✅ Opportunity lead source updated successfully')
+      return true
+    } else {
+      const errorText = await updateResponse.text()
+      console.error('❌ Failed to update opportunity lead source!')
+      console.error('   Status:', updateResponse.status, updateResponse.statusText)
+      console.error('   Error response:', errorText)
+      
+      // Try alternative format (object instead of array)
+      console.log('🔄 Trying alternative customFields format...')
+      const altUpdateData = {
+        customFields: {
+          lead_source: leadSource
+        }
+      }
+      
+      const altResponse = await fetch(`https://services.leadconnectorhq.com/opportunities/${opportunityId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': oppAuthHeader,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Version': '2021-07-28'
+        },
+        body: JSON.stringify(altUpdateData)
+      })
+      
+      if (altResponse.ok) {
+        console.log('✅ Opportunity lead source updated with alternative format')
+        return true
+      } else {
+        const altErrorText = await altResponse.text()
+        console.error('❌ Alternative format also failed:', altErrorText)
+        return false
+      }
+    }
+  } catch (error) {
+    console.error('Error updating opportunity lead source:', error)
+    return false
   }
 }
 

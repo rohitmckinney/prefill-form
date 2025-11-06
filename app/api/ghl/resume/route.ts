@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Force dynamic rendering - no caching
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(request: NextRequest) {
   try {
     const GHL_API_KEY = process.env.GHL_API_KEY
@@ -10,7 +14,14 @@ export async function GET(request: NextRequest) {
     if (!GHL_API_KEY || !GHL_LOCATION_ID) {
       return NextResponse.json(
         { success: false, error: 'GoHighLevel not configured' },
-        { status: 400 }
+        { 
+          status: 400,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        }
       )
     }
 
@@ -367,13 +378,26 @@ export async function GET(request: NextRequest) {
       success: true,
       forms: formsList,
       count: formsList.length
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     })
 
   } catch (error: any) {
     console.error('Error fetching resume forms:', error)
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      }
     )
   }
 }

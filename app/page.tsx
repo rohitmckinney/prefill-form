@@ -49,10 +49,21 @@ export default function HomePage() {
   }, [])
 
   // Fetch all opportunities from unfilled stage
-  const fetchResumeForms = async () => {
+  const fetchResumeForms = async (forceRefresh: boolean = false) => {
     setIsLoadingResumeForms(true)
     try {
-      const response = await fetch('/api/ghl/resume')
+      // Add cache-busting query parameter and cache control headers when refreshing
+      const url = forceRefresh 
+        ? `/api/ghl/resume?t=${Date.now()}` 
+        : '/api/ghl/resume'
+      
+      const response = await fetch(url, {
+        cache: forceRefresh ? 'no-store' : 'default',
+        headers: forceRefresh ? {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        } : {}
+      })
       const result = await response.json()
 
       if (response.ok && result.success) {
@@ -411,8 +422,9 @@ export default function HomePage() {
     try {
       console.log('📤 Saving to GoHighLevel on form submission...')
       
-      // Get agent name from localStorage
+      // Get agent name and lead source from localStorage
       const agentName = typeof window !== 'undefined' ? localStorage.getItem('agentProfile') : null
+      const leadSource = typeof window !== 'undefined' ? localStorage.getItem('leadSource') : null
       
       const response = await fetch('/api/ghl', {
         method: 'POST',
@@ -423,7 +435,8 @@ export default function HomePage() {
           ...data,
           _resumedOpportunityId: resumedOpportunityId,
           _resumedContactId: resumedContactId,
-          _agentName: agentName || null
+          _agentName: agentName || null,
+          _leadSource: leadSource || null
         }),
       })
 
@@ -476,8 +489,9 @@ export default function HomePage() {
         contactNumber: formData.contactNumber
       })
 
-      // Get agent name from localStorage
+      // Get agent name and lead source from localStorage
       const agentName = typeof window !== 'undefined' ? localStorage.getItem('agentProfile') : null
+      const leadSource = typeof window !== 'undefined' ? localStorage.getItem('leadSource') : null
       
       const response = await fetch('/api/ghl', {
         method: 'POST',
@@ -488,7 +502,8 @@ export default function HomePage() {
           ...formData,
           _resumedOpportunityId: resumedOpportunityId,
           _resumedContactId: resumedContactId,
-          _agentName: agentName || null
+          _agentName: agentName || null,
+          _leadSource: leadSource || null
         }),
       })
 
@@ -772,7 +787,7 @@ export default function HomePage() {
               <h2 className="text-lg font-semibold">Resume Forms</h2>
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={fetchResumeForms}
+                  onClick={() => fetchResumeForms(true)}
                   disabled={isLoadingResumeForms}
                   className="text-white hover:text-gray-300 transition-colors disabled:opacity-50"
                   title="Refresh forms"
@@ -803,7 +818,7 @@ export default function HomePage() {
                 <div className="text-center py-8">
                   <p className="text-gray-600">No forms found</p>
                   <button
-                    onClick={fetchResumeForms}
+                    onClick={() => fetchResumeForms(true)}
                     disabled={isLoadingResumeForms}
                     className="mt-4 px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
                   >
