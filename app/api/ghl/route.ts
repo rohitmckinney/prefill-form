@@ -11,27 +11,28 @@ export async function POST(request: NextRequest) {
     const resumedOpportunityId = formData._resumedOpportunityId
     const resumedContactId = formData._resumedContactId
     const agentName = formData._agentName
-    const leadSource = formData._leadSource
 
     // Remove internal fields from formData
     delete formData._resumedOpportunityId
     delete formData._resumedContactId
     delete formData._agentName
-    delete formData._leadSource
 
     // Validate required fields for contact creation
-    if (!formData.corporationName || !formData.contactName || !formData.contactEmail || !formData.contactNumber) {
+    if (!formData.corporationName || !formData.contactName || !formData.contactEmail || !formData.contactNumber || !formData.leadSource) {
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Missing required fields: Corporation Name, Contact Name, Contact Email, and Contact Number are required' 
+          error: 'Missing required fields: Corporation Name, Contact Name, Contact Email, Contact Number, and Lead Source are required' 
         },
         { status: 400 }
       )
     }
 
+    // Get lead source from formData (not localStorage)
+    const leadSource = formData.leadSource?.trim() || ''
+    
     // Validate lead source is provided
-    if (!leadSource || leadSource.trim() === '') {
+    if (!leadSource) {
       return NextResponse.json(
         { 
           success: false, 
@@ -230,6 +231,7 @@ function buildCompleteJSONData(formData: any) {
       contactEmail: formData.contactEmail,
       contactNumber: formData.contactNumber,
       corporationName: formData.corporationName,
+      leadSource: formData.leadSource,
     },
     
     companyInfo: {

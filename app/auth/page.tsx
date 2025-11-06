@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 export default function AuthPage() {
   const [selectedAgent, setSelectedAgent] = useState('')
   const [customName, setCustomName] = useState('')
-  const [leadSource, setLeadSource] = useState('')
   const router = useRouter()
 
   const agents = [
@@ -26,13 +25,10 @@ export default function AuthPage() {
   const handleContinue = () => {
     const agentName = selectedAgent === 'Other (Enter Name)' ? customName : selectedAgent
     
-    if (agentName && agentName.trim() !== '' && leadSource && leadSource.trim() !== '') {
+    if (agentName && agentName.trim() !== '') {
       // Store agent profile in localStorage
       localStorage.setItem('agentProfile', agentName)
       localStorage.setItem('agentLoginTime', new Date().toISOString())
-      
-      // Store lead source in localStorage (required)
-      localStorage.setItem('leadSource', leadSource.trim())
       
       // Redirect to main app
       router.push('/')
@@ -106,26 +102,12 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* Lead Source Input */}
-          <div className="relative">
-            <input
-              type="text"
-              value={leadSource}
-              onChange={(e) => setLeadSource(e.target.value)}
-              placeholder="Lead Source *"
-              required
-              className="w-full px-6 py-5 text-lg bg-white border border-black text-black 
-                       focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent
-                       font-light transition-all hover:bg-gray-50"
-            />
-          </div>
-
           {/* Continue Button */}
           <button
             onClick={handleContinue}
-            disabled={!selectedAgent || (selectedAgent === 'Other (Enter Name)' && !customName.trim()) || !leadSource.trim()}
+            disabled={!selectedAgent || (selectedAgent === 'Other (Enter Name)' && !customName.trim())}
             className={`w-full py-5 text-lg font-light tracking-wide transition-all
-                      ${(selectedAgent && (selectedAgent !== 'Other (Enter Name)' || customName.trim()) && leadSource.trim())
+                      ${(selectedAgent && (selectedAgent !== 'Other (Enter Name)' || customName.trim()))
                         ? 'bg-black text-white hover:bg-gray-800 cursor-pointer' 
                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}

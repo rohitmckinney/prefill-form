@@ -422,9 +422,8 @@ export default function HomePage() {
     try {
       console.log('📤 Saving to GoHighLevel on form submission...')
       
-      // Get agent name and lead source from localStorage
+      // Get agent name from localStorage
       const agentName = typeof window !== 'undefined' ? localStorage.getItem('agentProfile') : null
-      const leadSource = typeof window !== 'undefined' ? localStorage.getItem('leadSource') : null
       
       const response = await fetch('/api/ghl', {
         method: 'POST',
@@ -435,8 +434,7 @@ export default function HomePage() {
           ...data,
           _resumedOpportunityId: resumedOpportunityId,
           _resumedContactId: resumedContactId,
-          _agentName: agentName || null,
-          _leadSource: leadSource || null
+          _agentName: agentName || null
         }),
       })
 
@@ -472,8 +470,8 @@ export default function HomePage() {
     const formData = watch()
     
     // Validate required fields for full submission
-    if (!formData.corporationName || !formData.contactName || !formData.contactEmail || !formData.contactNumber) {
-      setGhlMessage('❌ Please fill in all required fields: Corporation Name, Contact Name, Contact Email, and Contact Number')
+    if (!formData.corporationName || !formData.contactName || !formData.contactEmail || !formData.contactNumber || !formData.leadSource) {
+      setGhlMessage('❌ Please fill in all required fields: Corporation Name, Contact Name, Contact Email, Contact Number, and Lead Source')
       setTimeout(() => setGhlMessage(null), 5000)
       return
     }
@@ -489,9 +487,8 @@ export default function HomePage() {
         contactNumber: formData.contactNumber
       })
 
-      // Get agent name and lead source from localStorage
+      // Get agent name from localStorage
       const agentName = typeof window !== 'undefined' ? localStorage.getItem('agentProfile') : null
-      const leadSource = typeof window !== 'undefined' ? localStorage.getItem('leadSource') : null
       
       const response = await fetch('/api/ghl', {
         method: 'POST',
@@ -502,8 +499,7 @@ export default function HomePage() {
           ...formData,
           _resumedOpportunityId: resumedOpportunityId,
           _resumedContactId: resumedContactId,
-          _agentName: agentName || null,
-          _leadSource: leadSource || null
+          _agentName: agentName || null
         }),
       })
 
@@ -565,6 +561,7 @@ export default function HomePage() {
       if (formData.personalInfo.contactEmail) setValue('contactEmail', formData.personalInfo.contactEmail)
       if (formData.personalInfo.contactNumber) setValue('contactNumber', formData.personalInfo.contactNumber)
       if (formData.personalInfo.corporationName) setValue('corporationName', formData.personalInfo.corporationName)
+      if (formData.personalInfo.leadSource) setValue('leadSource', formData.personalInfo.leadSource)
     }
 
     // Company Info
@@ -1104,13 +1101,19 @@ export default function HomePage() {
                       />
                     </div>
 
-                    {/* Row 2: Contact Email + Proposed Date + Prior Carrier + Target Premium */}
-                    <div className="grid grid-cols-4 gap-3">
+                    {/* Row 2: Contact Email + Lead Source + Proposed Date + Prior Carrier + Target Premium */}
+                    <div className="grid grid-cols-5 gap-3">
                       <DragDropFormField 
                         name="contactEmail" 
                         label="Contact Email" 
                         placeholder="Enter email address"
                         type="email"
+                        required
+                      />
+                      <DragDropFormField 
+                        name="leadSource" 
+                        label="Lead Source" 
+                        placeholder="Enter lead source"
                         required
                       />
                       <DragDropFormField 

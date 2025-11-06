@@ -7,6 +7,7 @@ export interface FormData {
   contactName: string
   contactNumber: string
   contactEmail: string
+  leadSource: string
   proposedEffectiveDate: string
   priorCarrier: string
   targetPremium: string
