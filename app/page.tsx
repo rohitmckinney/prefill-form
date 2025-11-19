@@ -37,6 +37,8 @@ export default function HomePage() {
   const [resumedContactId, setResumedContactId] = useState<string | null>(null)
   const [neonInsights, setNeonInsights] = useState<any>(null)
   const [ownershipInfo, setOwnershipInfo] = useState<any>(null)
+  const [submissionId, setSubmissionId] = useState<string | null>(null)
+  const [publicAccessToken, setPublicAccessToken] = useState<string | null>(null)
   const router = useRouter()
   const addressInputRef = useRef<HTMLInputElement>(null)
 
@@ -169,6 +171,18 @@ export default function HomePage() {
     formState: { errors },
     reset
   } = useForm<FormData>()
+
+  // Auto-calculate pumps when MPDs changes (MPD cost = $20,000)
+  const noOfMPDs = watch('noOfMPDs')
+  useEffect(() => {
+    if (noOfMPDs) {
+      const mpds = parseFloat(noOfMPDs)
+      if (!isNaN(mpds) && mpds > 0) {
+        const pumpsValue = mpds * 20000
+        setValue('pumps', pumpsValue.toString())
+      }
+    }
+  }, [noOfMPDs, setValue])
 
   const fetchData = async () => {
     if (!searchAddress || searchAddress.trim() === '') {
@@ -455,12 +469,13 @@ export default function HomePage() {
     setGhlMessage(null)
     
     try {
-      console.log('📤 Saving to GoHighLevel on form submission...')
+      console.log('📤 Saving to GoHighLevel and Coversheet on form submission...')
       
       // Get agent name from localStorage
       const agentName = typeof window !== 'undefined' ? localStorage.getItem('agentProfile') : null
       
-      const response = await fetch('/api/ghl', {
+      // Save to GoHighLevel
+      const ghlResponse = await fetch('/api/ghl', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -473,15 +488,46 @@ export default function HomePage() {
         }),
       })
 
-      const result = await response.json()
+      const ghlResult = await ghlResponse.json()
 
-      if (response.ok && result.success) {
-        setGhlMessage(`✅ Successfully saved to GoHighLevel! Contact ID: ${result.contactId || 'N/A'}. Complete JSON saved in contact note.`)
+      // Save to Coversheet database
+      let coversheetResult = null
+      try {
+        const coversheetResponse = await fetch('/api/coversheet/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...data,
+            _agentName: agentName || null
+          }),
+        })
+        coversheetResult = await coversheetResponse.json()
+        
+        if (coversheetResponse.ok && coversheetResult.success) {
+          setSubmissionId(coversheetResult.submissionId)
+          setPublicAccessToken(coversheetResult.publicAccessToken)
+          console.log('✅ Saved to Coversheet:', {
+            submissionId: coversheetResult.submissionId,
+            publicAccessToken: coversheetResult.publicAccessToken
+          })
+        }
+      } catch (coversheetError: any) {
+        console.error('Error saving to Coversheet:', coversheetError)
+        // Don't fail the whole submission if Coversheet save fails
+      }
+
+      if (ghlResponse.ok && ghlResult.success) {
+        const message = coversheetResult?.success 
+          ? `✅ Successfully saved to GoHighLevel and Coversheet! Contact ID: ${ghlResult.contactId || 'N/A'}.`
+          : `✅ Successfully saved to GoHighLevel! Contact ID: ${ghlResult.contactId || 'N/A'}. (Coversheet save failed)`
+        setGhlMessage(message)
         setIsSubmitted(true)
         setShowSuccess(true)
       } else {
         // Still show success for form submission, but warn about GHL
-        setGhlMessage(`⚠️ Form submitted, but GHL save failed: ${result.error || 'Unknown error'}`)
+        setGhlMessage(`⚠️ Form submitted, but GHL save failed: ${ghlResult.error || 'Unknown error'}`)
         setIsSubmitted(true)
         setShowSuccess(true)
       }
@@ -578,6 +624,18 @@ export default function HomePage() {
     setSelectedResumeForm(null)
     setNeonInsights(null)
     setOwnershipInfo(null)
+    setSubmissionId(null)
+    setPublicAccessToken(null)
+  }
+
+  const handleStartQuote = () => {
+    if (submissionId) {
+      // Use production URL for deployment
+      const coversheetUrl = `https://carrier-submission-tracker-system-for-insurance-production.up.railway.app/agent/submission/${submissionId}`
+      window.location.href = coversheetUrl
+    } else {
+      alert('Submission data not available. Please submit the form again.')
+    }
   }
 
   // Resume a form from GHL
@@ -931,7 +989,8 @@ export default function HomePage() {
           {/* Header matching PDF */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Mckinney & Co. Insurance</h1>
-            <h2 className="text-xl font-semibold text-gray-600">Convenience Store Application</h2>
+            <h2 className="text-xl font-semibold text-gray-600">Convenience Store Application - Agent Form</h2>
+            <p className="text-sm text-gray-500 mt-1">Only for Agents</p>
           </div>
         
         {/* Test the side panel structure */}
@@ -1779,6 +1838,14 @@ export default function HomePage() {
                     >
                       Download Filled PDF
                     </button>
+                    {submissionId && (
+                      <button
+                        onClick={handleStartQuote}
+                        className="bg-blue-600 text-white px-6 py-3 rounded-md font-medium hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Start Quote
+                      </button>
+                    )}
                     <button
                       onClick={resetForm}
                       className="bg-gray-600 text-white px-6 py-3 rounded-md font-medium hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"

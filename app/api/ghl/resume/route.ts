@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID
     const pipelineId = 'eognXr6blkaNJne4dTvs'
     const pipelineStageId = '1d2218ac-d2ac-4ef2-8dc3-46e76b9d9b4c'
+    
 
     if (!GHL_API_KEY || !GHL_LOCATION_ID) {
       return NextResponse.json(

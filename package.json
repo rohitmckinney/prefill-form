@@ -11,7 +11,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:neon": "node scripts/test-neon.js"
+    "test:neon": "node scripts/test-neon.js",
+    "setup:coversheet": "node scripts/setup-coversheet-db.js"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
