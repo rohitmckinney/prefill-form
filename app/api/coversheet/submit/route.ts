@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
       applicant_is: formData.applicantType || null,
       operation_description: formData.operationDescription || null,
       dba: formData.dba || null,
+      fein: formData.fein || null,
       address: formData.address || null,
       hours_of_operation: formData.hoursOfOperation || null,
       no_of_mpos: safeParseInt(formData.noOfMPDs),
@@ -148,14 +149,14 @@ export async function POST(request: NextRequest) {
       INSERT INTO insured_information (
         unique_identifier, ownership_type, corporation_name, contact_name, contact_number,
         contact_email, lead_source, proposed_effective_date, prior_carrier, target_premium,
-        applicant_is, operation_description, dba, address, hours_of_operation, no_of_mpos,
+        applicant_is, operation_description, dba, fein, address, hours_of_operation, no_of_mpos,
         construction_type, years_exp_in_business, years_at_location, year_built,
         year_latest_update, total_sq_footage, leased_out_space, protection_class,
         additional_insured, alarm_info, fire_info, property_coverage, general_liability,
         workers_compensation, source, eform_submission_id
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32
+        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33
       ) RETURNING id
     `
 
@@ -173,6 +174,7 @@ export async function POST(request: NextRequest) {
       insuredInfoData.applicant_is,
       insuredInfoData.operation_description,
       insuredInfoData.dba,
+      insuredInfoData.fein,
       insuredInfoData.address,
       insuredInfoData.hours_of_operation,
       insuredInfoData.no_of_mpos,
