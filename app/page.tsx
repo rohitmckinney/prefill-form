@@ -1586,7 +1586,7 @@ export default function HomePage() {
                                 placeholder="$"
                               />
                             </td>
-                            <td className="border border-gray-300 px-2 py-1 font-medium text-gray-700">Gasoline Sales</td>
+                            <td className="border border-gray-300 px-2 py-1 font-medium text-gray-700">gasoline gallons</td>
                             <td className="border border-gray-300 px-1 py-1">
                               <input
                                 {...register('gasSalesMonthly')}

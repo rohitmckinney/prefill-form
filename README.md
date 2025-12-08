@@ -138,6 +138,8 @@ Optional:
 - `GOOGLE_MAPS_API_KEY` - For Google Maps features
 - `SMARTY_AUTH_ID` - For Smarty Streets address validation
 - `SMARTY_AUTH_TOKEN` - For Smarty Streets address validation
+- `NEON_CONNECTION_STRING` - For Neon database GSOS business lookups
+- `COVERSHEET_STRING` - For Coversheet database (submissions and insured_information tables)
 
 ## License
 

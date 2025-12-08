@@ -281,7 +281,7 @@ export const generatePDF = (formData: FormData) => {
   drawCell(col2X + 60, col2YPos, 20, rowHeight, formData.liquorSalesYearly || '', false, 6)
   col2YPos += rowHeight
   
-  drawCell(col2X, col2YPos, 40, rowHeight, 'Gasoline Sales', false, 6)
+  drawCell(col2X, col2YPos, 40, rowHeight, 'gasoline gallons', false, 6)
   drawCell(col2X + 40, col2YPos, 20, rowHeight, formData.gasolineSalesMonthly || '', false, 6)
   drawCell(col2X + 60, col2YPos, 20, rowHeight, formData.gasolineSalesYearly || '', false, 6)
   col2YPos += rowHeight
