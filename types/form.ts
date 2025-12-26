@@ -1,6 +1,7 @@
 export interface FormData {
   // Address (top field)
   address: string
+  mailingAddress: string
   
   // Company Information
   corporationName: string
@@ -107,10 +108,14 @@ export interface FormData {
   yearOfLatestUpdate: string
   anyLeasedOutSpace: string
   protectionClass: string
-  additionalInsured: string
+  additionalInsuredType: string
+  additionalInsuredName: string
+  additionalInsuredAddress: string
   alarm: string
   noOfEmployees: string
   payroll: string
   officersInclExcl: string
   ownership: string
+  businessType: 'renewal' | 'newBusiness' | string
+  businessDescription: string
 }

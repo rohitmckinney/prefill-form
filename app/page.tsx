@@ -39,6 +39,10 @@ export default function HomePage() {
   const [ownershipInfo, setOwnershipInfo] = useState<any>(null)
   const [submissionId, setSubmissionId] = useState<string | null>(null)
   const [publicAccessToken, setPublicAccessToken] = useState<string | null>(null)
+  const [showBusinessTypeModal, setShowBusinessTypeModal] = useState(false)
+  const [pendingFormData, setPendingFormData] = useState<FormData | null>(null)
+  const [businessType, setBusinessType] = useState<'renewal' | 'newBusiness' | ''>('')
+  const [businessDescription, setBusinessDescription] = useState('')
   const router = useRouter()
   const addressInputRef = useRef<HTMLInputElement>(null)
 
@@ -183,6 +187,9 @@ export default function HomePage() {
       }
     }
   }, [noOfMPDs, setValue])
+
+  // Watch additional insured type for conditional fields
+  const additionalInsuredType = watch('additionalInsuredType')
 
   const fetchData = async () => {
     if (!searchAddress || searchAddress.trim() === '') {
@@ -425,12 +432,7 @@ export default function HomePage() {
       console.log('✅ Filled: Protection Class')
     }
 
-    // 16. Additional Insured (from lender/mortgage info)
-    if (smartyData.data.additionalInsured) {
-      setValue('additionalInsured', smartyData.data.additionalInsured)
-      filledCount++
-      console.log('✅ Filled: Additional Insured (Lender/Mortgagee)')
-    }
+    // 16. Additional Insured (removed - now using dropdown section)
     
     // === DIRECT MAPPINGS (if exact field names exist) ===
     const directMappings: Array<keyof FormData> = [
@@ -460,37 +462,63 @@ export default function HomePage() {
     setTimeout(() => setFetchMessage(null), 5000)
   }
 
-  const onSubmit = async (data: FormData) => {
-    console.log('Form submitted with data:', data)
-    setSubmittedData(data)
+  // Handle form submission - show modal first
+  const handleFormSubmit = (data: FormData) => {
+    setPendingFormData(data)
+    setShowBusinessTypeModal(true)
+  }
+
+  // Process submission after modal confirmation
+  const processSubmission = async () => {
+    if (!pendingFormData || !businessType) {
+      alert('Please select business type (Renewal or New Business)')
+      return
+    }
+
+    const dataWithBusinessType = {
+      ...pendingFormData,
+      businessType,
+      businessDescription
+    }
+
+    console.log('Form submitted with data:', dataWithBusinessType)
+    setSubmittedData(dataWithBusinessType)
+    setShowBusinessTypeModal(false)
     
-    // Also save to GHL when submitting
+    // Also save to GHL when submitting (only for new business)
     setIsSavingToGHL(true)
     setGhlMessage(null)
     
     try {
-      console.log('📤 Saving to GoHighLevel and Coversheet on form submission...')
-      
       // Get agent name from localStorage
       const agentName = typeof window !== 'undefined' ? localStorage.getItem('agentProfile') : null
       
-      // Save to GoHighLevel
-      const ghlResponse = await fetch('/api/ghl', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...data,
-          _resumedOpportunityId: resumedOpportunityId,
-          _resumedContactId: resumedContactId,
-          _agentName: agentName || null
-        }),
-      })
+      // Only save to GoHighLevel if it's NEW BUSINESS (skip for renewal to avoid duplicates)
+      let ghlResult = null
+      let ghlResponse = null
+      
+      if (businessType === 'newBusiness') {
+        console.log('📤 Saving to GoHighLevel and Coversheet on form submission...')
+        
+        ghlResponse = await fetch('/api/ghl', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...dataWithBusinessType,
+            _resumedOpportunityId: resumedOpportunityId,
+            _resumedContactId: resumedContactId,
+            _agentName: agentName || null
+          }),
+        })
 
-      const ghlResult = await ghlResponse.json()
+        ghlResult = await ghlResponse.json()
+      } else {
+        console.log('🔄 Renewal detected - skipping GoHighLevel to avoid duplicate entry')
+      }
 
-      // Save to Coversheet database
+      // Save to Coversheet database (for both renewal and new business)
       let coversheetResult = null
       try {
         const coversheetResponse = await fetch('/api/coversheet/submit', {
@@ -499,7 +527,7 @@ export default function HomePage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            ...data,
+            ...dataWithBusinessType,
             _agentName: agentName || null
           }),
         })
@@ -518,33 +546,48 @@ export default function HomePage() {
         // Don't fail the whole submission if Coversheet save fails
       }
 
-      if (ghlResponse.ok && ghlResult.success) {
-        const message = coversheetResult?.success 
-          ? `✅ Successfully saved to GoHighLevel and Coversheet! Contact ID: ${ghlResult.contactId || 'N/A'}.`
-          : `✅ Successfully saved to GoHighLevel! Contact ID: ${ghlResult.contactId || 'N/A'}. (Coversheet save failed)`
-        setGhlMessage(message)
-        setIsSubmitted(true)
-        setShowSuccess(true)
+      if (businessType === 'newBusiness') {
+        if (ghlResponse && ghlResponse.ok && ghlResult?.success) {
+          const message = coversheetResult?.success 
+            ? `✅ Successfully saved to GoHighLevel and Coversheet! Contact ID: ${ghlResult.contactId || 'N/A'}.`
+            : `✅ Successfully saved to GoHighLevel! Contact ID: ${ghlResult.contactId || 'N/A'}. (Coversheet save failed)`
+          setGhlMessage(message)
+          setIsSubmitted(true)
+          setShowSuccess(true)
+        } else {
+          // Still show success for form submission, but warn about GHL
+          setGhlMessage(`⚠️ Form submitted, but GHL save failed: ${ghlResult?.error || 'Unknown error'}`)
+          setIsSubmitted(true)
+          setShowSuccess(true)
+        }
       } else {
-        // Still show success for form submission, but warn about GHL
-        setGhlMessage(`⚠️ Form submitted, but GHL save failed: ${ghlResult.error || 'Unknown error'}`)
+        // Renewal - only saved to Coversheet
+        const message = coversheetResult?.success
+          ? `✅ Renewal saved to Coversheet! (Skipped GoHighLevel to avoid duplicate entry)`
+          : `⚠️ Renewal submitted, but Coversheet save failed: ${coversheetResult?.error || 'Unknown error'}`
+        setGhlMessage(message)
         setIsSubmitted(true)
         setShowSuccess(true)
       }
     } catch (error: any) {
-      console.error('Error saving to GHL:', error)
-      // Still show success for form submission, but warn about GHL
-      setGhlMessage(`⚠️ Form submitted, but GHL error: ${error.message || 'Unknown error'}`)
+      console.error('Error saving:', error)
+      setGhlMessage(`⚠️ Form submitted, but error occurred: ${error.message || 'Unknown error'}`)
       setIsSubmitted(true)
       setShowSuccess(true)
     } finally {
       setIsSavingToGHL(false)
+      setPendingFormData(null)
+      setBusinessType('')
+      setBusinessDescription('')
       setTimeout(() => {
         setShowSuccess(false)
         setGhlMessage(null)
       }, 5000)
     }
   }
+
+  // Original onSubmit for backward compatibility (now calls handleFormSubmit)
+  const onSubmit = handleFormSubmit
 
   const saveToGHL = async () => {
     // Get current form values
@@ -679,7 +722,7 @@ export default function HomePage() {
       if (formData.propertyDetails.yearsInCurrentLocation) setValue('yearsAtLocation', formData.propertyDetails.yearsInCurrentLocation)
       if (formData.propertyDetails.leasedSpace) setValue('anyLeasedOutSpace', formData.propertyDetails.leasedSpace)
       if (formData.propertyDetails.protectionClass) setValue('protectionClass', formData.propertyDetails.protectionClass)
-      if (formData.propertyDetails.additionalInsured) setValue('additionalInsured', formData.propertyDetails.additionalInsured)
+      // Additional Insured now uses dropdown section (additionalInsuredType, additionalInsuredName, additionalInsuredAddress)
       if (formData.propertyDetails.burglarAlarm) {
         const burglarAlarm = formData.propertyDetails.burglarAlarm
         if (burglarAlarm === 'Central Station' || burglarAlarm === 'Both') {
@@ -833,6 +876,93 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Business Type Modal */}
+      {showBusinessTypeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+              Business Type Selection
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Please select whether this is a renewal or new business application.
+            </p>
+
+            {/* Radio Buttons */}
+            <div className="space-y-4 mb-6">
+              <label className="flex items-center space-x-3 p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                <input
+                  type="radio"
+                  name="businessType"
+                  value="renewal"
+                  checked={businessType === 'renewal'}
+                  onChange={(e) => setBusinessType(e.target.value as 'renewal' | 'newBusiness')}
+                  className="w-5 h-5 text-blue-600"
+                />
+                <div>
+                  <span className="font-medium text-gray-700">Renewal</span>
+                  <p className="text-sm text-gray-500">Data will NOT be sent to GoHighLevel to avoid duplicate entry</p>
+                </div>
+              </label>
+
+              <label className="flex items-center space-x-3 p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                <input
+                  type="radio"
+                  name="businessType"
+                  value="newBusiness"
+                  checked={businessType === 'newBusiness'}
+                  onChange={(e) => setBusinessType(e.target.value as 'renewal' | 'newBusiness')}
+                  className="w-5 h-5 text-blue-600"
+                />
+                <div>
+                  <span className="font-medium text-gray-700">New Business</span>
+                  <p className="text-sm text-gray-500">Data will be sent to GoHighLevel and Coversheet</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Description Field */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description (Optional)
+              </label>
+              <textarea
+                value={businessDescription}
+                onChange={(e) => setBusinessDescription(e.target.value)}
+                placeholder="Enter any additional notes or description..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowBusinessTypeModal(false)
+                  setPendingFormData(null)
+                  setBusinessType('')
+                  setBusinessDescription('')
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={processSubmission}
+                disabled={!businessType || isSavingToGHL}
+                className={`px-6 py-2 rounded-lg text-white transition-colors ${
+                  businessType && !isSavingToGHL
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isSavingToGHL ? 'Submitting...' : 'Confirm & Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Agent Header - Minimal Black Bar */}
       <div className="bg-black text-white py-3 px-6 flex justify-between items-center">
         <div className="flex items-center space-x-3">
@@ -1353,6 +1483,11 @@ export default function HomePage() {
                           label="Address" 
                           placeholder="Enter property address"
                         />
+                        <DragDropFormField 
+                          name="mailingAddress" 
+                          label="Mailing Address" 
+                          placeholder="Enter mailing address"
+                        />
                       </div>
                     </div>
 
@@ -1409,18 +1544,53 @@ export default function HomePage() {
                       />
                     </div>
 
-                    {/* Row 8: Protection Class + Additional Insured */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* Row 8: Protection Class */}
+                    <div className="grid grid-cols-1 gap-3">
                       <DragDropFormField 
                         name="protectionClass" 
                         label="Protection Class:" 
                         placeholder="Enter protection class"
                       />
-                      <DragDropFormField 
-                        name="additionalInsured" 
-                        label="Additional Insured:" 
-                        placeholder="Enter additional insured"
-                      />
+                    </div>
+
+                    {/* Additional Insured Section */}
+                    <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <h3 className="text-lg font-semibold mb-4 text-gray-800">Additional Insured / Loss Payee / Lender / Mortgagee</h3>
+                      
+                      <div className="space-y-4">
+                        {/* Dropdown */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Type
+                          </label>
+                          <select
+                            {...register('additionalInsuredType')}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">Select type</option>
+                            <option value="Additional Insured">Additional Insured</option>
+                            <option value="Loss Payee">Loss Payee</option>
+                            <option value="Lenders">Lenders</option>
+                            <option value="Mortgagee">Mortgagee</option>
+                          </select>
+                        </div>
+
+                        {/* Conditional Name and Address Fields */}
+                        {additionalInsuredType && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <DragDropFormField 
+                              name="additionalInsuredName" 
+                              label="Name" 
+                              placeholder={`Enter ${additionalInsuredType} name`}
+                            />
+                            <DragDropFormField 
+                              name="additionalInsuredAddress" 
+                              label="Address" 
+                              placeholder={`Enter ${additionalInsuredType} address`}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Row 9: Alarm (Compact Inline) */}
