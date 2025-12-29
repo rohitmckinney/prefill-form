@@ -192,7 +192,10 @@ export const generatePDF = (formData: FormData) => {
   drawCell(leftMargin, yPos, 35, rowHeight, 'Protection Class:', true)
   drawCell(leftMargin + 35, yPos, 55, rowHeight, formData.protectionClass || '')
   drawCell(leftMargin + 90, yPos, 48, rowHeight, 'Additional Insured:', true)
-  drawCell(leftMargin + 138, yPos, tableWidth - 138, rowHeight, formData.additionalInsured || '')
+  const additionalInsuredText = formData.additionalInsuredType 
+    ? `${formData.additionalInsuredType}${formData.additionalInsuredName ? ': ' + formData.additionalInsuredName : ''}${formData.additionalInsuredAddress ? ' - ' + formData.additionalInsuredAddress : ''}`
+    : ''
+  drawCell(leftMargin + 138, yPos, tableWidth - 138, rowHeight, additionalInsuredText)
   yPos += rowHeight
   
   // Alarm Section
