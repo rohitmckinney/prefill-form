@@ -1117,7 +1117,13 @@ export default function HomePage() {
       <div className="py-8 px-4">
         <div className="max-w-7xl mx-auto h-full">
           {/* Header matching PDF */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-8 relative">
+            <a href="https://deployment-delta-eight.vercel.app/" className="absolute left-0 top-0 flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span className="text-sm font-medium">Back to Dashboard</span>
+            </a>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Mckinney & Co. Insurance</h1>
             <h2 className="text-xl font-semibold text-gray-600">Convenience Store Application - Agent Form</h2>
             <p className="text-sm text-gray-500 mt-1">Only for Agents</p>
