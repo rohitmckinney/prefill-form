@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       total_sq_footage: safeParseInt(formData.totalSqFootage),
       leased_out_space: formData.anyLeasedOutSpace || null,
       protection_class: formData.protectionClass || null,
-      additional_insured: formData.additionalInsured || null,
+      additional_interests: formData.additionalInterests || [],
       alarm_info: {
         burglar: {
           centralStation: formData.burglarAlarm?.centralStation || false,

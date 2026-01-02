@@ -1,3 +1,23 @@
+
+export interface Building {
+  id: string
+  address: string
+  sqFootage: string
+  construction: string
+  yearBuilt: string
+  businessIncome: string
+  businessPersonalProperty: string
+  sales: string
+  description: string
+}
+
+export interface AdditionalInterest {
+  id: string
+  type: string
+  name: string
+  address: string
+}
+
 export interface FormData {
   // Address (top field)
   address: string
@@ -108,9 +128,7 @@ export interface FormData {
   yearOfLatestUpdate: string
   anyLeasedOutSpace: string
   protectionClass: string
-  additionalInsuredType: string
-  additionalInsuredName: string
-  additionalInsuredAddress: string
+  additionalInterests: AdditionalInterest[]
   alarm: string
   noOfEmployees: string
   payroll: string
@@ -118,4 +136,5 @@ export interface FormData {
   ownership: string
   businessType: 'renewal' | 'newBusiness' | string
   businessDescription: string
+  buildings: Building[]
 }

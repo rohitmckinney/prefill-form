@@ -252,7 +252,7 @@ function buildCompleteJSONData(formData: any) {
       yearsInCurrentLocation: formData.yearsAtLocation,
       leasedSpace: formData.anyLeasedOutSpace,
       protectionClass: formData.protectionClass,
-      additionalInsured: formData.additionalInsured,
+      additionalInterests: formData.additionalInterests || [],
       burglarAlarm: formData.burglarAlarm?.centralStation || formData.burglarAlarm?.local ? 'Yes' : 'No',
       fireAlarm: formData.fireAlarm?.centralStation || formData.fireAlarm?.local ? 'Yes' : 'No',
       acres: formData.acres,

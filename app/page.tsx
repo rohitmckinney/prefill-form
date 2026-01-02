@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { FormSection } from '@/components/FormSection'
-import { FormData } from '@/types/form'
+import { FormData, Building, AdditionalInterest } from '@/types/form'
 import { generatePDF } from '@/lib/pdf'
 import { AreaMeasurementModal } from '@/components/AreaMeasurementModal'
 
@@ -43,6 +43,26 @@ export default function HomePage() {
   const [pendingFormData, setPendingFormData] = useState<FormData | null>(null)
   const [businessType, setBusinessType] = useState<'renewal' | 'newBusiness' | ''>('')
   const [businessDescription, setBusinessDescription] = useState('')
+  const [buildings, setBuildings] = useState<Building[]>([])
+  const [showBuildingModal, setShowBuildingModal] = useState(false)
+  const [additionalInterests, setAdditionalInterests] = useState<AdditionalInterest[]>([])
+  const [currentAdditionalInterest, setCurrentAdditionalInterest] = useState<AdditionalInterest>({
+    id: '',
+    type: '',
+    name: '',
+    address: ''
+  })
+  const [currentBuilding, setCurrentBuilding] = useState<Building>({
+    id: '',
+    address: '',
+    sqFootage: '',
+    construction: '',
+    yearBuilt: '',
+    businessIncome: '',
+    businessPersonalProperty: '',
+    sales: '',
+    description: ''
+  })
   const router = useRouter()
   const addressInputRef = useRef<HTMLInputElement>(null)
 
@@ -55,6 +75,65 @@ export default function HomePage() {
       fetchResumeForms()
     }
   }, [])
+
+
+  // Handle adding a building
+  const handleAddBuilding = () => {
+    if (currentBuilding.address || currentBuilding.sqFootage || currentBuilding.construction || 
+        currentBuilding.yearBuilt || currentBuilding.businessIncome || currentBuilding.businessPersonalProperty || 
+        currentBuilding.sales || currentBuilding.description) {
+      const newBuilding: Building = {
+        ...currentBuilding,
+        id: Date.now().toString()
+      }
+      setBuildings([...buildings, newBuilding])
+      // Reset form
+      setCurrentBuilding({
+        id: '',
+        address: watch('address') || '',
+        sqFootage: '',
+        construction: '',
+        yearBuilt: '',
+        businessIncome: '',
+        businessPersonalProperty: '',
+        sales: '',
+        description: ''
+      })
+      setShowBuildingModal(false)
+    }
+  }
+
+  // Handle removing a building
+  const handleRemoveBuilding = (id: string) => {
+    setBuildings(buildings.filter(b => b.id !== id))
+  }
+
+  // Handle adding an additional interest
+  const handleAddAdditionalInterest = () => {
+    if (additionalInterests.length >= 3) {
+      alert('Maximum of 3 additional interests allowed')
+      return
+    }
+    if (currentAdditionalInterest.type && (currentAdditionalInterest.name || currentAdditionalInterest.address)) {
+      const newInterest: AdditionalInterest = {
+        ...currentAdditionalInterest,
+        id: Date.now().toString()
+      }
+      setAdditionalInterests([...additionalInterests, newInterest])
+      // Reset form
+      setCurrentAdditionalInterest({
+        id: '',
+        type: '',
+        name: '',
+        address: ''
+      })
+    }
+  }
+
+  // Handle removing an additional interest
+  const handleRemoveAdditionalInterest = (id: string) => {
+    setAdditionalInterests(additionalInterests.filter(ai => ai.id !== id))
+  }
 
   // Fetch all opportunities from unfilled stage
   const fetchResumeForms = async (forceRefresh: boolean = false) => {
@@ -188,8 +267,14 @@ export default function HomePage() {
     }
   }, [noOfMPDs, setValue])
 
-  // Watch additional insured type for conditional fields
-  const additionalInsuredType = watch('additionalInsuredType')
+  // Sync building address with main form address only when modal opens
+  useEffect(() => {
+    if (showBuildingModal) {
+      const mainAddress = watch('address')
+      setCurrentBuilding(prev => ({ ...prev, address: mainAddress || '' }))
+    }
+  }, [showBuildingModal]) // Only run when modal opens/closes, not on every address change
+
 
   const fetchData = async () => {
     if (!searchAddress || searchAddress.trim() === '') {
@@ -464,7 +549,11 @@ export default function HomePage() {
 
   // Handle form submission - show modal first
   const handleFormSubmit = (data: FormData) => {
-    setPendingFormData(data)
+    const dataWithBuildings = {
+      ...data,
+      buildings
+    }
+    setPendingFormData(dataWithBuildings)
     setShowBusinessTypeModal(true)
   }
 
@@ -478,7 +567,9 @@ export default function HomePage() {
     const dataWithBusinessType = {
       ...pendingFormData,
       businessType,
-      businessDescription
+      businessDescription,
+      buildings,
+      additionalInterests
     }
 
     console.log('Form submitted with data:', dataWithBusinessType)
@@ -957,6 +1048,163 @@ export default function HomePage() {
                 }`}
               >
                 {isSavingToGHL ? 'Submitting...' : 'Confirm & Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Building Modal */}
+      {showBuildingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+              Add a Building
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Add building information (all fields are optional)
+            </p>
+
+            <div className="space-y-4">
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  value={currentBuilding.address}
+                  onChange={(e) => setCurrentBuilding({ ...currentBuilding, address: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Address (mapped from main form)"
+                />
+              </div>
+
+              {/* Square Footage */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Square Footage
+                </label>
+                <input
+                  type="text"
+                  value={currentBuilding.sqFootage}
+                  onChange={(e) => setCurrentBuilding({ ...currentBuilding, sqFootage: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Square footage"
+                />
+              </div>
+
+              {/* Construction */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Construction
+                </label>
+                <input
+                  type="text"
+                  value={currentBuilding.construction}
+                  onChange={(e) => setCurrentBuilding({ ...currentBuilding, construction: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Construction type"
+                />
+              </div>
+
+              {/* Year Built */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Year Built
+                </label>
+                <input
+                  type="text"
+                  value={currentBuilding.yearBuilt}
+                  onChange={(e) => setCurrentBuilding({ ...currentBuilding, yearBuilt: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Year built"
+                />
+              </div>
+
+              {/* Business Income */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Business Income
+                </label>
+                <input
+                  type="text"
+                  value={currentBuilding.businessIncome}
+                  onChange={(e) => setCurrentBuilding({ ...currentBuilding, businessIncome: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Business income"
+                />
+              </div>
+
+              {/* Business Personal Property */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Business Personal Property
+                </label>
+                <input
+                  type="text"
+                  value={currentBuilding.businessPersonalProperty}
+                  onChange={(e) => setCurrentBuilding({ ...currentBuilding, businessPersonalProperty: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Business personal property"
+                />
+              </div>
+
+              {/* Sales */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Sales
+                </label>
+                <input
+                  type="text"
+                  value={currentBuilding.sales}
+                  onChange={(e) => setCurrentBuilding({ ...currentBuilding, sales: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Sales"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={currentBuilding.description}
+                  onChange={(e) => setCurrentBuilding({ ...currentBuilding, description: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Description"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowBuildingModal(false)
+                  setCurrentBuilding({
+                    id: '',
+                    address: watch('address') || '',
+                    sqFootage: '',
+                    construction: '',
+                    yearBuilt: '',
+                    businessIncome: '',
+                    businessPersonalProperty: '',
+                    sales: '',
+                    description: ''
+                  })
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddBuilding}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                Add Building
               </button>
             </div>
           </div>
@@ -1559,44 +1807,105 @@ export default function HomePage() {
                       />
                     </div>
 
-                    {/* Additional Insured Section */}
+                    {/* Additional Interests Section */}
                     <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <h3 className="text-lg font-semibold mb-4 text-gray-800">Additional Insured / Loss Payee / Lender / Mortgagee</h3>
-                      
-                      <div className="space-y-4">
-                        {/* Dropdown */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Type
-                          </label>
-                          <select
-                            {...register('additionalInsuredType')}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-gray-800">Additional Interests (Max 3)</h3>
+                        {additionalInterests.length < 3 && (
+                          <button
+                            type="button"
+                            onClick={handleAddAdditionalInterest}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
                           >
-                            <option value="">Select type</option>
-                            <option value="Additional Insured">Additional Insured</option>
-                            <option value="Loss Payee">Loss Payee</option>
-                            <option value="Lenders">Lenders</option>
-                            <option value="Mortgagee">Mortgagee</option>
-                          </select>
-                        </div>
-
-                        {/* Conditional Name and Address Fields */}
-                        {additionalInsuredType && (
-                          <div className="grid grid-cols-2 gap-3">
-                            <DragDropFormField 
-                              name="additionalInsuredName" 
-                              label="Name" 
-                              placeholder={`Enter ${additionalInsuredType} name`}
-                            />
-                            <DragDropFormField 
-                              name="additionalInsuredAddress" 
-                              label="Address" 
-                              placeholder={`Enter ${additionalInsuredType} address`}
-                            />
-                          </div>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add Additional Interest
+                          </button>
                         )}
                       </div>
+
+                      {/* List of Added Additional Interests */}
+                      {additionalInterests.length > 0 && (
+                        <div className="space-y-3 mb-4">
+                          {additionalInterests.map((interest, index) => (
+                            <div key={interest.id} className="bg-white p-4 rounded-lg border border-gray-200 flex justify-between items-start">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-800">Additional Interest {index + 1}</h4>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  <strong>Type:</strong> {interest.type}<br />
+                                  {interest.name && <><strong>Name:</strong> {interest.name}<br /></>}
+                                  {interest.address && <><strong>Address:</strong> {interest.address}</>}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAdditionalInterest(interest.id)}
+                                className="ml-4 text-red-600 hover:text-red-800"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Form to Add New Additional Interest */}
+                      {additionalInterests.length < 3 && (
+                        <div className="space-y-4 bg-white p-4 rounded-lg border border-gray-300">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Type
+                            </label>
+                            <select
+                              value={currentAdditionalInterest.type}
+                              onChange={(e) => setCurrentAdditionalInterest({ ...currentAdditionalInterest, type: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="">Select type</option>
+                              <option value="Additional Insured">Additional Insured</option>
+                              <option value="Loss Payee">Loss Payee</option>
+                              <option value="Lenders">Lenders</option>
+                              <option value="Mortgagee">Mortgagee</option>
+                            </select>
+                          </div>
+
+                          {currentAdditionalInterest.type && (
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Name
+                                </label>
+                                <input
+                                  type="text"
+                                  value={currentAdditionalInterest.name}
+                                  onChange={(e) => setCurrentAdditionalInterest({ ...currentAdditionalInterest, name: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder={`Enter ${currentAdditionalInterest.type} name`}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Address
+                                </label>
+                                <input
+                                  type="text"
+                                  value={currentAdditionalInterest.address}
+                                  onChange={(e) => setCurrentAdditionalInterest({ ...currentAdditionalInterest, address: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder={`Enter ${currentAdditionalInterest.type} address`}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {additionalInterests.length === 0 && (
+                        <p className="text-sm text-gray-500 text-center py-4">No additional interests added yet. Click "Add Additional Interest" to get started.</p>
+                      )}
                     </div>
 
                     {/* Row 9: Alarm (Compact Inline) */}
@@ -1925,6 +2234,71 @@ export default function HomePage() {
                         {ghlMessage}
                       </div>
                     )}
+
+                    {/* Buildings Section */}
+                    <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-300">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-gray-800">Buildings</h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrentBuilding({
+                              id: '',
+                              address: watch('address') || '',
+                              sqFootage: '',
+                              construction: '',
+                              yearBuilt: '',
+                              businessIncome: '',
+                              businessPersonalProperty: '',
+                              sales: '',
+                              description: ''
+                            })
+                            setShowBuildingModal(true)
+                          }}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Add a Building
+                        </button>
+                      </div>
+                      
+                      {buildings.length > 0 && (
+                        <div className="space-y-3">
+                          {buildings.map((building, index) => (
+                            <div key={building.id} className="bg-white p-4 rounded-lg border border-gray-200 flex justify-between items-start">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-800">Building {index + 1}</h4>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  <strong>Address:</strong> {building.address || 'N/A'}<br />
+                                  {building.sqFootage && <><strong>SQ Footage:</strong> {building.sqFootage}<br /></>}
+                                  {building.construction && <><strong>Construction:</strong> {building.construction}<br /></>}
+                                  {building.yearBuilt && <><strong>Year Built:</strong> {building.yearBuilt}<br /></>}
+                                  {building.businessIncome && <><strong>Business Income:</strong> {building.businessIncome}<br /></>}
+                                  {building.businessPersonalProperty && <><strong>BPP:</strong> {building.businessPersonalProperty}<br /></>}
+                                  {building.sales && <><strong>Sales:</strong> {building.sales}<br /></>}
+                                  {building.description && <><strong>Description:</strong> {building.description}</>}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveBuilding(building.id)}
+                                className="ml-4 text-red-600 hover:text-red-800"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {buildings.length === 0 && (
+                        <p className="text-sm text-gray-500 text-center py-4">No buildings added yet. Click "Add a Building" to get started.</p>
+                      )}
+                    </div>
 
                     {/* Submit Button */}
                     <div className="flex justify-between items-center pt-6">
