@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
         applicant_is, operation_description, dba, fein, address, hours_of_operation, no_of_mpos,
         construction_type, years_exp_in_business, years_at_location, year_built,
         year_latest_update, total_sq_footage, leased_out_space, protection_class,
-        additional_insured, alarm_info, fire_info, property_coverage, general_liability,
+        additional_interests, alarm_info, fire_info, property_coverage, general_liability,
         workers_compensation, source, eform_submission_id
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
       insuredInfoData.total_sq_footage,
       insuredInfoData.leased_out_space,
       insuredInfoData.protection_class,
-      insuredInfoData.additional_insured,
+      JSON.stringify(insuredInfoData.additional_interests),
       JSON.stringify(insuredInfoData.alarm_info),
       JSON.stringify(insuredInfoData.fire_info),
       JSON.stringify(insuredInfoData.property_coverage),
