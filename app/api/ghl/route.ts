@@ -60,13 +60,8 @@ export async function POST(request: NextRequest) {
       const apiKey: string = GHL_API_KEY!
       const locationId: string = GHL_LOCATION_ID!
       
-      // Update contact's agent name if provided
-      if (agentName) {
-        await updateContactAgentName(resumedContactId, agentName, apiKey)
-      }
-      
       // Update opportunity with new data
-      const opportunityId = await updateOpportunityWithData(resumedOpportunityId, resumedContactId, formData, apiKey, leadSource, locationId)
+      const opportunityId = await updateOpportunityWithData(resumedOpportunityId, resumedContactId, formData, apiKey, leadSource, locationId, agentName || undefined)
       
       // Add updated JSON as new note
       await addFormDataAsNote(resumedContactId, formData, apiKey, resumedOpportunityId)
@@ -178,12 +173,7 @@ export async function POST(request: NextRequest) {
       console.log('✅ Contact created in GoHighLevel:', ghlData.contact?.id)
       
       if (ghlData.contact?.id) {
-        // Update contact's agent name if provided (must be done after creation)
-        if (agentName) {
-          await updateContactAgentName(ghlData.contact.id, agentName, GHL_API_KEY!)
-        }
-        
-        const opportunityId = await createOpportunityWithJSON(ghlData.contact.id, formData, GHL_API_KEY, leadSource, GHL_LOCATION_ID)
+        const opportunityId = await createOpportunityWithJSON(ghlData.contact.id, formData, GHL_API_KEY, leadSource, GHL_LOCATION_ID, agentName || undefined)
         
         // Add complete JSON as note to contact (more reliable than opportunity notes)
         await addFormDataAsNote(ghlData.contact.id, formData, GHL_API_KEY, opportunityId || undefined)
@@ -295,7 +285,7 @@ function buildCompleteJSONData(formData: any) {
 }
 
 // Create opportunity with mapped fields
-async function createOpportunityWithJSON(contactId: string, formData: any, apiKey: string, leadSource: string, locationId?: string) {
+async function createOpportunityWithJSON(contactId: string, formData: any, apiKey: string, leadSource: string, locationId?: string, agentName?: string) {
   try {
     // Use the specific pipeline and stage IDs provided
     const pipelineId = 'eognXr6blkaNJne4dTvs'
@@ -364,6 +354,11 @@ async function createOpportunityWithJSON(contactId: string, formData: any, apiKe
         await updateOpportunityLeadSource(opportunityId, leadSource.trim(), apiKey)
       }
       
+      // Update opportunity with assigned agent (opp_assigned_to) if provided
+      if (opportunityId && agentName) {
+        await updateOpportunityAssignedTo(opportunityId, agentName, apiKey)
+      }
+      
       return opportunityId
     } else {
       const errorText = await oppResponse.text()
@@ -380,7 +375,7 @@ async function createOpportunityWithJSON(contactId: string, formData: any, apiKe
 }
 
 // Update existing opportunity with new form data
-async function updateOpportunityWithData(opportunityId: string, contactId: string, formData: any, apiKey: string, leadSource: string, locationId?: string) {
+async function updateOpportunityWithData(opportunityId: string, contactId: string, formData: any, apiKey: string, leadSource: string, locationId?: string, agentName?: string) {
   try {
     console.log('🔄 Updating opportunity with new data...')
     console.log('   Opportunity ID:', opportunityId)
@@ -430,6 +425,11 @@ async function updateOpportunityWithData(opportunityId: string, contactId: strin
         await updateOpportunityLeadSource(opportunityId, leadSource.trim(), apiKey)
       }
       
+      // Update opportunity with assigned agent (opp_assigned_to) if provided
+      if (agentName) {
+        await updateOpportunityAssignedTo(opportunityId, agentName, apiKey)
+      }
+      
       return opportunityId
     } else {
       const errorText = await updateResponse.text()
@@ -441,6 +441,79 @@ async function updateOpportunityWithData(opportunityId: string, contactId: strin
   } catch (error) {
     console.error('Error updating opportunity:', error)
     return null
+  }
+}
+
+// Update opportunity with assigned agent (opp_assigned_to custom field)
+async function updateOpportunityAssignedTo(opportunityId: string, agentName: string, apiKey: string) {
+  try {
+    console.log('👤 Updating opportunity assigned to:', agentName)
+    console.log('   Opportunity ID:', opportunityId)
+    console.log('   Custom Field Key: opp_assigned_to')
+    
+    // Use customFields array format for custom field {{ opportunity.opp_assigned_to }}
+    const updateData = {
+      customFields: [
+        {
+          key: 'opp_assigned_to', // GoHighLevel custom field: {{ opportunity.opp_assigned_to }}
+          value: agentName
+        }
+      ]
+    }
+    
+    const oppAuthHeader = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`
+    
+    const updateResponse = await fetch(`https://services.leadconnectorhq.com/opportunities/${opportunityId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': oppAuthHeader,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Version': '2021-07-28'
+      },
+      body: JSON.stringify(updateData)
+    })
+    
+    if (updateResponse.ok) {
+      console.log('✅ Opportunity assigned to updated successfully')
+      return true
+    } else {
+      const errorText = await updateResponse.text()
+      console.error('❌ Failed to update opportunity assigned to!')
+      console.error('   Status:', updateResponse.status, updateResponse.statusText)
+      console.error('   Error response:', errorText)
+      
+      // Try alternative format (object instead of array)
+      console.log('🔄 Trying alternative customFields format...')
+      const altUpdateData = {
+        customFields: {
+          opp_assigned_to: agentName
+        }
+      }
+      
+      const altResponse = await fetch(`https://services.leadconnectorhq.com/opportunities/${opportunityId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': oppAuthHeader,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Version': '2021-07-28'
+        },
+        body: JSON.stringify(altUpdateData)
+      })
+      
+      if (altResponse.ok) {
+        console.log('✅ Opportunity assigned to updated with alternative format')
+        return true
+      } else {
+        const altErrorText = await altResponse.text()
+        console.error('❌ Alternative format also failed:', altErrorText)
+        return false
+      }
+    }
+  } catch (error) {
+    console.error('Error updating opportunity assigned to:', error)
+    return false
   }
 }
 
@@ -603,47 +676,6 @@ async function updateOpportunityWithJSONField(opportunityId: string, jsonString:
     }
   } catch (error) {
     console.error('Error updating opportunity custom field:', error)
-  }
-}
-
-// Update contact's assigned agent name
-async function updateContactAgentName(contactId: string, agentName: string, apiKey: string) {
-  try {
-    console.log('👤 Updating contact agent name:', agentName)
-    
-    const authHeader = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`
-    
-    const updateData = {
-      customFields: [
-        {
-          key: 'assigned_mckinney_agent',
-          value: agentName
-        }
-      ]
-    }
-    
-    const updateResponse = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Version': '2021-07-28'
-      },
-      body: JSON.stringify(updateData)
-    })
-    
-    if (updateResponse.ok) {
-      console.log('✅ Contact agent name updated successfully')
-      return true
-    } else {
-      const errorText = await updateResponse.text()
-      console.error('❌ Failed to update contact agent name:', errorText)
-      return false
-    }
-  } catch (error) {
-    console.error('Error updating contact agent name:', error)
-    return false
   }
 }
 

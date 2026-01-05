@@ -11,13 +11,16 @@ console.log('📋 Sending data for:', data.corporation_name);
 
 // Prepare the request
 const options = {
-  hostname: 'loreless-muoi-whimsically.ngrok-free.dev',
+  hostname: 'webhook.mightyinvestmentgroup.com',
   port: 443,
   path: '/application',
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(jsonData)
+    'Content-Length': Buffer.byteLength(jsonData),
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US,en;q=0.9'
   },
   timeout: 10000 // 10 second timeout
 };
@@ -47,7 +50,7 @@ const req = https.request(options, (res) => {
 req.on('error', (error) => {
   console.error('\n❌ Request Error:', error.message);
   if (error.code === 'ETIMEDOUT') {
-    console.error('⏱️  Request timed out. The ngrok endpoint may be down or unreachable.');
+    console.error('⏱️  Request timed out. The webhook endpoint may be down or unreachable.');
   }
 });
 
@@ -60,5 +63,5 @@ req.on('timeout', () => {
 req.write(jsonData);
 req.end();
 
-console.log('\n🚀 Sending POST request to ngrok endpoint...\n');
+console.log('\n🚀 Sending POST request to webhook endpoint...\n');
 

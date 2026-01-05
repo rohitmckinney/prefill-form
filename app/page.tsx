@@ -52,6 +52,16 @@ export default function HomePage() {
     name: '',
     address: ''
   })
+  const [showLeadSourceDropdown, setShowLeadSourceDropdown] = useState(false)
+  const leadSourceOptions = [
+    'Tahir', 'Ahmed', 'Alex Fazwani', 'Ali Ajani', 'Aly Virani', 'Amber', 'Ana', 'ARA', 'Asad', 'Ayaz Ali',
+    'Cinco', 'Inbound Call', 'Cold Lead', 'Cross sell', 'Customer Referral', 'David', 'Employers Nancy',
+    'ENDORSEMENT', 'Existing Insured', 'Existing insured - new project', 'Expo', 'Hector', 'Internet',
+    'John Sipple', 'Karim Virani', 'Ladaji', 'Lana', 'Munira', 'Myra', 'NATA', 'Nizar', 'Nur', 'Other',
+    'Raabel', 'Rahim', 'Razia', 'Razia New Prospect', 'Razia winback', 'Reshop', 'Rewrite', 'Rozmin Ali',
+    'Shahnaz', 'Shahzaib', 'Sherika', 'Sunil Dosi', 'Tanya', 'Teejay', 'Tej', 'VA Sales', 'Walk In',
+    'Website', 'Win Back', 'Zara'
+  ]
   const [currentBuilding, setCurrentBuilding] = useState<Building>({
     id: '',
     address: '',
@@ -573,6 +583,7 @@ export default function HomePage() {
     }
 
     console.log('Form submitted with data:', dataWithBusinessType)
+    console.log('🌐 WEBHOOK DEBUG: businessType =', businessType)
     setSubmittedData(dataWithBusinessType)
     setShowBusinessTypeModal(false)
     
@@ -589,6 +600,7 @@ export default function HomePage() {
       let ghlResponse = null
       
       if (businessType === 'newBusiness') {
+        console.log('🌐 WEBHOOK DEBUG: Entering newBusiness block')
         console.log('📤 Saving to GoHighLevel and Coversheet on form submission...')
         
         ghlResponse = await fetch('/api/ghl', {
@@ -635,6 +647,45 @@ export default function HomePage() {
       } catch (coversheetError: any) {
         console.error('Error saving to Coversheet:', coversheetError)
         // Don't fail the whole submission if Coversheet save fails
+      }
+
+      // Send to webhook endpoint (only for new business) - This runs regardless of Coversheet success/failure
+      console.log('═══════════════════════════════════════════════════════')
+      console.log('🌐 WEBHOOK: Starting webhook process...')
+      console.log('🌐 WEBHOOK DEBUG: About to check businessType for webhook. Current value:', businessType)
+      console.log('🌐 WEBHOOK DEBUG: businessType type:', typeof businessType)
+      if (businessType === 'newBusiness') {
+        console.log('🌐 WEBHOOK DEBUG: businessType is newBusiness, proceeding with webhook call')
+        try {
+          console.log('🌐 WEBHOOK: Starting webhook submission...')
+          console.log('🌐 WEBHOOK: Business Type:', businessType)
+          console.log('📤 Sending data to webhook endpoint...')
+          
+          const webhookResponse = await fetch('/api/webhook/application', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(dataWithBusinessType),
+          })
+
+          console.log('🌐 WEBHOOK: Response status:', webhookResponse.status)
+          const webhookResult = await webhookResponse.json()
+          console.log('🌐 WEBHOOK: Response data:', webhookResult)
+          
+          if (webhookResponse.ok && webhookResult.success) {
+            console.log('✅ Data sent to webhook successfully:', webhookResult.webhookResponse)
+          } else {
+            console.warn('⚠️ Webhook submission had issues:', webhookResult.error || webhookResult.message)
+            // Don't fail the whole submission if webhook fails
+          }
+        } catch (webhookError: any) {
+          console.error('❌ Error sending to webhook:', webhookError)
+          console.error('❌ Webhook error details:', webhookError.message, webhookError.stack)
+          // Don't fail the whole submission if webhook fails
+        }
+      } else {
+        console.log('🌐 WEBHOOK: Skipped (Business Type:', businessType, '- not newBusiness)')
       }
 
       if (businessType === 'newBusiness') {
@@ -1665,12 +1716,58 @@ export default function HomePage() {
                         type="email"
                         required
                       />
-                      <DragDropFormField 
-                        name="leadSource" 
-                        label="Lead Source" 
-                        placeholder="Enter lead source"
-                        required
-                      />
+                      <div className="relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Lead Source <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          {...register('leadSource', { required: 'Lead Source is required' })}
+                          type="text"
+                          value={watch('leadSource') || ''}
+                          onChange={(e) => {
+                            setValue('leadSource', e.target.value)
+                            setShowLeadSourceDropdown(true)
+                          }}
+                          onFocus={() => {
+                            setShowLeadSourceDropdown(true)
+                          }}
+                          onBlur={() => {
+                            // Delay hiding dropdown to allow click selection
+                            setTimeout(() => setShowLeadSourceDropdown(false), 200)
+                          }}
+                          placeholder="Type to search lead source..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        {showLeadSourceDropdown && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                            {leadSourceOptions
+                              .filter(option => 
+                                option.toLowerCase().includes((watch('leadSource') || '').toLowerCase())
+                              )
+                              .map((option, index) => (
+                                <div
+                                  key={index}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault() // Prevent onBlur from firing before click
+                                    setValue('leadSource', option)
+                                    setShowLeadSourceDropdown(false)
+                                  }}
+                                  className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                >
+                                  {option}
+                                </div>
+                              ))}
+                            {leadSourceOptions.filter(option => 
+                              option.toLowerCase().includes((watch('leadSource') || '').toLowerCase())
+                            ).length === 0 && (
+                              <div className="px-3 py-2 text-gray-500 text-sm">No matches found</div>
+                            )}
+                          </div>
+                        )}
+                        {errors.leadSource && (
+                          <p className="mt-1 text-sm text-red-600">{errors.leadSource.message as string}</p>
+                        )}
+                      </div>
                       <DragDropFormField 
                         name="proposedEffectiveDate" 
                         label="Proposed Effective Date" 
